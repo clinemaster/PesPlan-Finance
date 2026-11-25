@@ -24,7 +24,7 @@ Phase 2; one of them is urgent and unrelated to code.
 
 | # | Finding | Severity | Why it matters |
 |---|---|---|---|
-| F1 | The `origin` remote does not exist — `git ls-remote` returns *"Repository not found"* | **Urgent** | All work exists only on this machine, on one local branch, with no off-machine backup |
+| F1 | The `origin` remote did not exist — `git ls-remote` returned *"Repository not found"* | ~~Urgent~~ **Resolved 2026-11-25** | All work existed only on this machine. A reachable remote was configured and the history pushed; see §5 |
 | F2 | No authentication, and no `user_id` anywhere in the schema | **High** | Blocks exposing the API to a mobile device over a network |
 | F3 | `PRAGMA user_version` is stamped but there is no migration runner | **Medium** | Needed before any additive schema change, to honour "no breaking database changes" |
 
@@ -161,6 +161,8 @@ Notes for Phase 2:
 
 ## 5. Git and backup verification
 
+**As assessed, 2026-11-25:**
+
 | Check | Result |
 |---|---|
 | Repository | Yes, `master`, 3 commits |
@@ -179,21 +181,38 @@ Commit history:
 36c52d2  Initial commit: LifePilot Finance CLI
 ```
 
-### F1 — Urgent: there is no working backup
+### F1 — was: there is no working backup
 
-The configured remote does not resolve. Either the GitHub repository was never created, it was
-created under a different name or owner, or the account lacks access. The practical effect is
-that **every line of this project exists in exactly one place: this machine's working
-directory.** A disk failure loses the project.
-
-Recommended immediate action (not performed — it changes remote state and needs your
-credentials):
-
-1. Create the repository on GitHub under the intended account.
-2. Confirm the URL, then `git push -u origin master`.
-3. Verify with `git ls-remote --heads origin`.
+At the time of assessment the configured remote did not resolve, so **every line of this
+project existed in exactly one place: this machine's working directory.** The recommended
+action was to create the repository, push, and verify with `git ls-remote --heads origin`.
 
 Nothing in the working tree was overwritten, discarded, or reset during this assessment.
+
+#### Status: resolved — 2026-11-25
+
+A reachable remote was configured and the history pushed. The remote is **not** the URL
+recorded above; it was repointed to a different account and repository name:
+
+| | |
+|---|---|
+| Remote | `origin` → `https://github.com/clinemaster/PesPlan-Finance.git` |
+| Remote reachable | **Yes** — `git ls-remote --heads origin` returns `refs/heads/main` |
+| Local branch | `main` (renamed from `master` after this assessment), tracking `origin/main` |
+| Pushed through | `c37772f` — Phase 02, the full history including both earlier commits |
+
+Two consequences worth recording rather than leaving to be discovered:
+
+1. **The repository name does not match the project name.** The remote is *PesPlan-Finance*,
+   while the codebase is LifePilot Finance throughout — the Dart package is
+   `lifepilot_finance` and the Android application ID is `com.lifepilot.lifepilot_finance`.
+   If this reflects a product rename rather than just a repository name, the package name and
+   application ID should be changed deliberately and **before** any store release, because
+   both are painful to change afterwards.
+2. **The database is still not backed up by this.** `.gitignore` correctly excludes
+   `data/*.db`, so pushing protects the code and never the financial data. A separate backup
+   routine for the SQLite file remains outstanding — see
+   `PROPOSED_SYSTEM_ARCHITECTURE.md` §7.
 
 ---
 
@@ -268,8 +287,9 @@ use the real state:
 Ordered so that each step is independently valuable and low-risk, with the riskiest
 architectural decisions made early but implemented late.
 
-**Step 0 — Secure the work (do first, blocks nothing else)**
-Fix the remote and push. Confirm `git ls-remote` succeeds. *(F1)*
+**Step 0 — Secure the work** — ✅ **done 2026-11-25.**
+Remote configured and history pushed; `git ls-remote` succeeds. *(F1 resolved — see §5.)*
+Still outstanding: a backup routine for `data/finance.db`, which git deliberately excludes.
 
 **Step 1 — Database foundations** *(small, enables everything after)*
 - Add a migration runner driven by `PRAGMA user_version`, with `SCHEMA_VERSION` already in

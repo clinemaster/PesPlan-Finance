@@ -243,13 +243,15 @@ is a no-op rather than a duplicate.
 
 ### Backup — unresolved and urgent
 
-F1 stands: the configured `origin` remote does not exist, so the code has no off-machine copy.
-Separately, the database is correctly git-ignored (D9), which means **git will never back up
-financial data.** The architecture needs an explicit answer:
+F1 is **resolved as of 2026-11-25**: a reachable remote is configured
+(`clinemaster/PesPlan-Finance`) and the history is pushed, so the code now has an off-machine
+copy. The data half is not:
 
-- **Code:** working remote + `git push`. Not yet done.
-- **Data:** scheduled copy of `data/finance.db` (SQLite `.backup` or `VACUUM INTO` for a
-  consistent snapshot while the server runs) to storage outside the machine. Not yet designed.
+- **Code:** working remote + `git push`. ✅ Done.
+- **Data:** the database is correctly git-ignored (D9), which means **git will never back up
+  financial data.** A scheduled copy of `data/finance.db` (SQLite `.backup` or `VACUUM INTO`
+  for a consistent snapshot while the server runs) to storage outside the machine is **still
+  outstanding and still undesigned.** Pushing code is not a data backup.
 
 ---
 
@@ -345,7 +347,7 @@ by uvicorn directly) so that a core-only install never tries to import FastAPI.
 | **Floats in the JSON contract** | Rounding drift in a ledger | Rule 2. Contract test asserts `*_cents` fields are integers |
 | **Schema change without a migration** | A user's database breaks or silently loses a column | Rule 4 + migration runner before any change (D1) |
 | **API exposed without auth** | Financial data readable by anyone on the network | Token auth lands in the same step as the first non-loopback bind (F2) |
-| **Work lost — no backup** | Total loss of the project | Fix the remote and push (F1). **Open, urgent** |
+| **Work lost — no backup** | Total loss of the project | Code: remote configured and pushed (F1). ✅ **Closed.** Data: `data/finance.db` is git-ignored and has no backup routine. **Open** |
 | **Web frontend rewritten "while we're here"** | Loses a tested, accessible, dependency-free UI | Explicitly out of scope; `web.py`/`render.py` are retained |
 | **Service relocation breaks the dashboard** | Regression in working software | The 172 tests must pass untouched after every relocation step |
 | **Scope creep into multi-user** | Large cost for a single-user product | Decide D4 deliberately before writing auth |
