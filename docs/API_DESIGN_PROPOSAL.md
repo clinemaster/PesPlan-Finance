@@ -301,7 +301,7 @@ router layer translates these to `409` and `404`. Do not change the domain funct
 
 ## 7. Authentication
 
-**Phase 2 (single user):** static bearer token.
+**Phase 2 (single user — decided 2026-11-26):** static bearer token.
 
 - Token read from `LIFEPILOT_API_TOKEN` (or a `0600` secret file). Never committed.
 - Verified with `secrets.compare_digest` in a FastAPI dependency applied to the whole `/api/v1`
@@ -312,7 +312,8 @@ router layer translates these to `409` and `404`. Do not change the domain funct
 - Pairing convenience: display the token as a QR code from a CLI subcommand so the phone need
   not have it typed in.
 
-**If multi-user is ever required (D4):** `user_id` on all three tables via an additive migration,
+**If multi-user is ever required** — not planned; single user was decided 2026-11-26 (D4) —
+`user_id` on all three tables via an additive migration,
 scoping enforced inside `db.py` query functions — not in routers, where one forgotten filter
 becomes a data leak — plus a real credential store and session tokens. **Do not build this
 speculatively.** Decide first whether LifePilot is a single-user product.
@@ -384,8 +385,18 @@ at step 3. **Nothing in steps 1–6 modifies `reports.py` or `categorize.py`.**
 
 ## 11. Open questions for review
 
-1. **Single-user or multi-user?** (D4) This decides the auth design and whether `user_id`
-   migrations are needed. Recommendation: commit to single-user for Phase 2.
+1. ~~**Single-user or multi-user?**~~ **DECIDED 2026-11-26: single user.** (D4)
+   LifePilot is a single-user product. Consequences, which Phase 03 should treat as settled:
+   * **No `user_id` columns.** The schema stays as assessed. No migration is needed for
+     identity, and `db.py` queries need no scoping clause.
+   * **Auth is a static bearer token** (§7), not a credential store, session management or
+     OAuth. One token, one person.
+   * **SQLite stays** — there is no concurrency argument for Postgres (§7 of
+     `PROPOSED_SYSTEM_ARCHITECTURE.md`).
+   * **Anything that assumes more than one person is out of scope**: sharing, roles,
+     permissions, per-user settings, invitations.
+   If this is ever revisited, the path is still additive — `user_id` with a default on the
+   three tables, scoped inside `db.py` — but it must not be built speculatively now.
 2. **Where will the backend run** — the desktop that has the data today, a home server, or a
    cloud host? This decides the TLS and backup design.
 3. **Does the mobile app need offline writes**, or is read-only-when-away acceptable for v1?

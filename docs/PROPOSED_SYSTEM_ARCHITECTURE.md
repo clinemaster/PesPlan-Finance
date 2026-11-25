@@ -237,8 +237,8 @@ is a no-op rather than a duplicate.
 | Busy timeout? | **Yes, 5s** | Brief contention should retry, not error (D3) |
 | Connection pooling? | **No** | Connection-per-request is already the pattern and is correct for SQLite |
 | ORM? | **No** | `db.py` is 217 lines of clear SQL with full test coverage. An ORM would be a rewrite of working code for no gain |
-| Postgres? | **Only if genuine multi-user arrives** | The migration path exists (`db.py` is the only module with SQL), but do not pay for it speculatively |
-| Multi-user `user_id`? | **Decide before building auth, implement only if needed** | Retro-fitting `user_id` onto three tables is additive but touches every query. If single-user is the product, say so and move on (D4) |
+| Postgres? | **No** | Multi-user is not coming (decided 2026-11-26), which removes the only argument for it. The migration path exists if that changes |
+| Multi-user `user_id`? | **No — single user decided 2026-11-26** | The product is single-user, so no `user_id`, no query scoping, no identity migration. The additive path remains available if that ever changes, but is not to be built speculatively (D4) |
 | Sync columns? | **Add `created_at` / `updated_at` when offline sync is built** | Required for `?since=` incremental sync (D7) |
 
 ### Backup — unresolved and urgent
@@ -262,7 +262,7 @@ copy. The data half is not:
 | Transport | Plain HTTP on loopback | TLS at the proxy for anything off-machine; API binds loopback only |
 | Authentication | **None** (F2) | Bearer token required on all `/api/v1/*`; token from env/secret file, never committed; compared with `secrets.compare_digest` |
 | Mobile token storage | — | OS keystore via `flutter_secure_storage`; never in `SharedPreferences` or source |
-| Authorization | None needed (single user) | If multi-user lands, `user_id` scoping in `db.py` — enforced at the query, not the router |
+| Authorization | None needed (single user, decided 2026-11-26) | Authentication alone is sufficient: one token, one person. No roles, no per-row scoping |
 | Input validation | argparse + CSV parsing | Schema validation at the API edge; domain validators (`parse_money`, `parse_date`) retained as the second line |
 | Output escaping | `render.esc` on every value | Unchanged for HTML. JSON needs no escaping, but Flutter must treat `description` as untrusted text and never render it as markup |
 | CSP | `default-src 'none'` | Unchanged — the existing policy is strong |
@@ -350,7 +350,7 @@ by uvicorn directly) so that a core-only install never tries to import FastAPI.
 | **Work lost — no backup** | Total loss of the project | Code: remote configured and pushed (F1). ✅ **Closed.** Data: `data/finance.db` is git-ignored and has no backup routine. **Open** |
 | **Web frontend rewritten "while we're here"** | Loses a tested, accessible, dependency-free UI | Explicitly out of scope; `web.py`/`render.py` are retained |
 | **Service relocation breaks the dashboard** | Regression in working software | The 172 tests must pass untouched after every relocation step |
-| **Scope creep into multi-user** | Large cost for a single-user product | Decide D4 deliberately before writing auth |
+| **Scope creep into multi-user** | Large cost for a single-user product | ✅ **Settled 2026-11-26: single user.** Treat sharing, roles and per-user data as out of scope unless the decision is formally revisited |
 
 ---
 

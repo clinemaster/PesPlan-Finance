@@ -272,7 +272,7 @@ use the real state:
 |---|---|
 | **No REST API** | `web.py` serves HTML plus two JSON endpoints (`/api/report`, `/api/year`). These are read-only, unversioned, and shaped for the dashboard rather than as a general contract — but they are a useful starting point |
 | **No authentication** | The server binds loopback and warns when told otherwise. Acceptable for a local dashboard, unacceptable for a phone on a network |
-| **No multi-user model** | No `user_id` on any table. Single-user is a legitimate product decision, but it should be a decision, not an accident |
+| ~~No multi-user model~~ | **Resolved 2026-11-26: single user, decided deliberately.** No `user_id` is needed; the schema is correct as it stands |
 | **Write operations are CLI-only** | The web layer never writes. `db.py` already has the write functions a mobile client needs |
 | **No migration runner** | `init_db()` is idempotent `CREATE TABLE IF NOT EXISTS` and stamps `user_version = 1`; nothing reads that version to upgrade an older file |
 | **`journal_mode = delete`** | Default rollback journal. Under an API with concurrent readers, WAL is the right setting |
@@ -325,7 +325,8 @@ Still outstanding: a backup routine for `data/finance.db`, which git deliberatel
 
 **Step 7 — Hardening**
 - Coverage measurement in CI, API contract tests, rate limiting, TLS termination guidance,
-  and multi-user `user_id` migration *only if the product actually needs more than one user*.
+  and TLS termination guidance. Multi-user `user_id` migration is **not** in scope — single
+  user was decided 2026-11-26.
 
 ### Suggested gate between steps
 

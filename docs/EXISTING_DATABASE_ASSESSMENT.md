@@ -327,7 +327,7 @@ browser at once:
 | D1 | No migration runner despite a version stamp | **Medium** | Add one before any schema change (Phase 2 Step 1) |
 | D2 | `journal_mode = delete` | **Medium** | Switch to WAL when the API lands |
 | D3 | No `busy_timeout` | Low | Pass `timeout=5.0` on connect |
-| D4 | No `user_id` on any table | **High for mobile** | Decide single-user vs multi-user *before* building auth |
+| D4 | No `user_id` on any table | ~~High~~ **Closed 2026-11-26** | Single user decided. The absence of `user_id` is now correct by design, not a gap — no identity migration is needed |
 | D5 | Categories/accounts are free-text with no registry | Low–Medium | Optional additive `categories` table; do not convert to FKs |
 | D6 | No currency column | Low | Add with a default when multi-currency is actually needed |
 | D7 | No `created_at` / `updated_at` | Low | Needed for incremental mobile sync (`?since=`); add additively |
