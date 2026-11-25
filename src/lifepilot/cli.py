@@ -10,7 +10,7 @@ import sqlite3
 import sys
 from datetime import date as Date
 
-from . import categorize, db, importers, reports
+from . import categorize, db, importers, reports, web
 from .models import UNCATEGORIZED, Budget, Rule, Transaction, parse_date
 from .money import format_money, parse_money
 
@@ -310,6 +310,15 @@ def cmd_report(args: argparse.Namespace, conn: sqlite3.Connection) -> int:
     return 2
 
 
+def cmd_serve(args: argparse.Namespace, conn: sqlite3.Connection | None) -> int:
+    return web.serve(
+        host=args.host,
+        port=args.port,
+        db_path=args.db,
+        open_browser=args.open,
+    )
+
+
 # --- parser ---------------------------------------------------------------
 
 
@@ -407,12 +416,20 @@ def build_parser() -> argparse.ArgumentParser:
     rbud.add_argument("--month", help="default: this month")
     p.set_defaults(func=cmd_report)
 
+    p = sub.add_parser("serve", help="browse the reports in a local web UI")
+    p.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1 (loopback only)")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--open", action="store_true", help="open a browser window")
+    p.set_defaults(func=cmd_serve, needs_conn=False)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if not getattr(args, "needs_conn", True):
+            return args.func(args, None)
         with db.session(args.db) as conn:
             return args.func(args, conn)
     except ValueError as exc:

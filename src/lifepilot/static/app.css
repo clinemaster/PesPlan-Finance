@@ -1,0 +1,458 @@
+/* LifePilot Finance - dashboard styles.
+ *
+ * Color tokens are declared three times on purpose: the light values on bare
+ * :root, the dark values under prefers-color-scheme (guarded so an explicit
+ * light choice still wins), and again under [data-theme="dark"] so the toggle
+ * wins in both directions. Dark steps are chosen for the dark surface, not
+ * derived by flipping the light ones.
+ */
+
+:root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;        /* card surface */
+  --page: #f9f9f7;             /* page plane */
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+
+  --series-1: #2a78d6;         /* income / magnitude */
+  --series-2: #eb6834;         /* expenses */
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+
+  --delta-good: #006300;
+  --delta-bad: #d03b3b;
+
+  --radius: 10px;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --delta-good: #0ca30c;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --delta-good: #0ca30c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font: 14px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--series-1); }
+a:hover { text-decoration: none; }
+
+:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- chrome ------------------------------------------------------------ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 24px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { font-weight: 600; letter-spacing: -0.01em; }
+.brand-dim { color: var(--text-muted); font-weight: 400; }
+
+.topbar nav { display: flex; gap: 4px; margin-right: auto; }
+
+.topbar nav a {
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.topbar nav a:hover { background: color-mix(in oklab, var(--text-primary) 6%, transparent); }
+
+.topbar nav a.current {
+  color: var(--text-primary);
+  background: color-mix(in oklab, var(--text-primary) 8%, transparent);
+  font-weight: 500;
+}
+
+.ghost-btn {
+  font: inherit;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ghost-btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in oklab, var(--text-primary) 6%, transparent);
+}
+
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* --- filter row (one row, above everything it scopes) ----------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filters label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.filters select,
+.filters input {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+/* --- cards ------------------------------------------------------------- */
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px 20px;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.card-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.card-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-right: auto;
+}
+
+.card-head .ghost-btn { margin-left: auto; font-size: 12px; padding: 3px 8px; }
+.card-sub + .ghost-btn { margin-left: 0; }
+
+.empty { color: var(--text-secondary); margin: 0; }
+.note { color: var(--text-muted); font-size: 12px; margin: 10px 0 0; }
+
+/* --- headline: one hero figure + KPI tiles ---------------------------- */
+
+.headline {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.4fr);
+  gap: 18px;
+}
+
+@media (max-width: 760px) {
+  .headline { grid-template-columns: 1fr; }
+}
+
+/* The hero card centres its figure against the taller tiles card beside it. */
+.hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* min-width:0 keeps a long value from blowing out its grid column. */
+.tile { min-width: 0; }
+
+.tile-label {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Proportional figures: tabular-nums makes a large number look loose. */
+.hero-value {
+  margin: 0;
+  font-size: 48px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.delta { margin: 8px 0 0; font-size: 13px; }
+.delta-good { color: var(--delta-good); }
+.delta-bad { color: var(--delta-bad); }
+.delta-flat { color: var(--text-muted); }
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 18px 12px;
+  align-content: center;
+}
+
+.tile-value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* --- category bars ---------------------------------------------------- */
+
+.bars { display: flex; flex-direction: column; gap: 10px; }
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 150px) 1fr minmax(78px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 2px 0;
+  border-radius: 6px;
+}
+
+.bar-row:hover { background: color-mix(in oklab, var(--text-primary) 4%, transparent); }
+
+.bar-name {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* Bars stay thin, square at the baseline, 4px rounded at the data end. */
+.bar-track {
+  height: 14px;
+  background: color-mix(in oklab, var(--text-primary) 5%, transparent);
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--series-1);
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* --- svg chart -------------------------------------------------------- */
+
+.chart { width: 100%; height: auto; display: block; }
+
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { stroke: var(--axis); stroke-width: 1; }
+
+.chart .tick {
+  fill: var(--text-muted);
+  font: 11px var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart .col-label {
+  fill: var(--text-secondary);
+  font: 11px var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart .col.series-1 { fill: var(--series-1); }
+.chart .col.series-2 { fill: var(--series-2); }
+
+.chart .hit { fill: transparent; }
+.chart .hit:hover,
+.chart .hit:focus-visible { fill: color-mix(in oklab, var(--text-primary) 5%, transparent); }
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.key { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Bars and areas get a rect key; a line chart would get a short stroke. */
+.swatch { width: 10px; height: 10px; border-radius: 2px; }
+.swatch.series-1 { background: var(--series-1); }
+.swatch.series-2 { background: var(--series-2); }
+
+/* --- budget meters ---------------------------------------------------- */
+
+.meters { display: flex; flex-direction: column; gap: 16px; }
+
+.meter-row { border-radius: 6px; }
+
+.meter-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.meter-name { font-weight: 500; }
+
+.status { margin-left: auto; font-size: 12px; color: var(--text-secondary); }
+.status-icon { font-weight: 700; }
+
+.meter-ok { --meter: var(--series-1); }
+.meter-warning { --meter: var(--status-warning); }
+.meter-critical { --meter: var(--status-critical); }
+
+.status-ok { color: var(--series-1); }
+.status-warning { color: var(--status-warning); }
+.status-critical { color: var(--status-critical); }
+
+/* The unfilled track is a lighter step of the fill's own hue. */
+.meter-track {
+  display: block;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in oklab, var(--meter) 16%, var(--surface-1));
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--meter);
+  border-radius: 0 4px 4px 0;
+}
+
+.meter-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* --- tables ----------------------------------------------------------- */
+
+/* Wide content scrolls inside its own box; the page never scrolls sideways. */
+.scroll-x { overflow-x: auto; }
+
+.table-view { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.data th,
+table.data td {
+  text-align: left;
+  padding: 7px 10px 7px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: normal;
+}
+
+table.data th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+table.data tfoot td {
+  border-bottom: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data .nowrap { white-space: nowrap; }
+table.data .neg { color: var(--text-primary); }
+table.data .pos { color: var(--delta-good); }
+
+/* --- tooltip ---------------------------------------------------------- */
+
+#tooltip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  max-width: 260px;
+  padding: 8px 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Values lead, labels follow. */
+#tooltip .tip-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+#tooltip .tip-label { display: block; }
+#tooltip .tip-extra { display: block; color: var(--text-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

@@ -55,6 +55,7 @@ Summary - 2026-11-01 to 2026-11-30
 | `rules list\|add\|rm\|seed` | Manage categorization rules |
 | `budget list\|set\|rm` | Manage monthly budgets per category |
 | `report summary\|categories\|trend\|budget` | Reports |
+| `serve` | Browse the reports in a local web UI |
 
 Every command accepts `--db PATH`. Date ranges accept either `--month YYYY-MM` or
 `--from`/`--to`.
@@ -116,6 +117,41 @@ groceries    180.00    197.37  -17.37  110% OVER
 housing    1,200.00  1,150.00   50.00        96%
 ```
 
+## Web UI
+
+```bash
+lifepilot serve --open        # http://127.0.0.1:8765/
+```
+
+| Route | What it shows |
+| --- | --- |
+| `/` | Dashboard: net for the month, income/expenses/savings tiles, spending by category, a 12-month income-vs-expenses chart, budget meters, recent transactions |
+| `/transactions` | Full transaction list for a month, filterable by category and description |
+| `/api/report?month=YYYY-MM` | The same numbers as JSON, for scripting |
+
+`--host` (default `127.0.0.1`), `--port` (default `8765`) and `--db` all apply.
+
+Notes on how it behaves:
+
+- **Read-only.** The server renders reports and never writes to the database.
+  Recording and editing stay in the CLI.
+- **Loopback by default, and no authentication.** The pages show your finances,
+  so binding anything other than localhost prints a warning - put it behind
+  something that authenticates before you expose it.
+- **No dependencies, nothing from the network.** It runs on `http.server`, the
+  charts are server-rendered SVG and CSS, and a Content-Security-Policy of
+  `default-src 'none'` blocks any outbound request. Descriptions imported from
+  CSV are HTML-escaped and tooltips are built with `textContent`, so an odd
+  merchant name can never become markup.
+- **Usable without JavaScript.** The month picker is a plain GET form, and every
+  chart has a "Table" toggle holding the same values as text - hover is never
+  the only way to read a number.
+- **Follows your system light/dark setting**, with a toggle that overrides it.
+
+The month selector is the only filter and it scopes the whole page. Months come
+from the data, so the picker only offers months you actually have transactions
+in (plus whatever you ask for by URL).
+
 ## Notes on the numbers
 
 - **Transfers are excluded** from summaries, category breakdowns and trends. Money
@@ -137,7 +173,10 @@ src/lifepilot/
   importers.py    CSV reading and column detection
   categorize.py   rule matching and the starter ruleset
   reports.py      summaries, category breakdowns, trends, budget vs actual
-tests/            pytest suite (87 tests)
+  web.py          read-only http.server app + JSON endpoint
+  render.py       HTML/SVG rendering for the web UI
+  static/         app.css, app.js (served by web.py)
+tests/            pytest suite (131 tests)
 sample_data/      an example CSV export
 data/             your database lives here (gitignored)
 ```
