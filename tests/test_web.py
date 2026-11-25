@@ -189,3 +189,105 @@ def test_resolve_month_on_an_empty_database(tmp_path):
         month, months = web.resolve_month(conn, None)
         assert month in months
         assert len(months) == 1
+
+
+# --- yearly ---------------------------------------------------------------
+
+
+@pytest.fixture
+def two_years(tmp_path):
+    """Two full-ish years, so year-over-year has something to compare."""
+    path = tmp_path / "years.db"
+    rows = []
+    for year, pay, rent in ((2025, 300000, -100000), (2026, 320000, -110000)):
+        for month in range(1, 13 if year == 2025 else 7):
+            rows.append(
+                Transaction(date(year, month, 1), "ACME PAYROLL", pay, category="income")
+            )
+            rows.append(Transaction(date(year, month, 3), "Rent", rent, category="housing"))
+            rows.append(
+                Transaction(date(year, month, 7), "TESCO", -8000 - month * 100,
+                            category="groceries")
+            )
+    with db.session(path) as conn:
+        db.add_transactions(conn, rows)
+    return path
+
+
+@pytest.fixture
+def years_url(two_years):
+    server = web.make_server(port=web.free_port(), db_path=two_years, quiet=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address[:2]
+        yield f"http://{host}:{port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_year_page_renders_both_charts(years_url):
+    status, _, body = get(f"{years_url}/year?year=2026")
+    text = body.decode("utf-8")
+    assert status == 200
+    assert "Spent in 2026" in text
+    assert 'class="col series-2"' in text          # monthly spending columns
+    assert 'class="line series-2"' in text         # this year's line
+    assert 'class="line series-context"' in text   # last year's line
+    assert text.count("data-cx=") == 12            # a crosshair position per month
+
+
+def test_year_page_defaults_to_the_newest_year(years_url):
+    _, _, body = get(f"{years_url}/year")
+    assert "Spent in 2026" in body.decode("utf-8")
+
+
+def test_year_page_handles_a_year_without_data(years_url):
+    status, _, body = get(f"{years_url}/year?year=2019")
+    text = body.decode("utf-8")
+    assert status == 200
+    assert "No transactions recorded in 2019" in text
+
+
+def test_year_page_ignores_a_junk_year(years_url):
+    status, _, body = get(f"{years_url}/year?year=abc")
+    assert status == 200
+    assert "Spent in 2026" in body.decode("utf-8")
+
+
+def test_api_year(years_url):
+    _, headers, body = get(f"{years_url}/api/year?year=2026")
+    assert headers["Content-Type"] == "application/json; charset=utf-8"
+    payload = json.loads(body)
+    assert payload["year"] == 2026
+    # 2026 runs January to June in the fixture; the rest are nulls, not zeros.
+    assert sum(1 for m in payload["months"] if m) == 6
+    assert payload["months"][6] is None
+    assert payload["previous_year"]["year"] == 2025
+    assert sum(1 for m in payload["previous_year"]["months"] if m) == 12
+    assert payload["average_monthly_spend_cents"] > 0
+    assert [y["year"] for y in payload["years"]] == [2025, 2026]
+
+
+def test_api_year_monthly_figures(years_url):
+    _, _, body = get(f"{years_url}/api/year?year=2026")
+    january = json.loads(body)["months"][0]
+    assert january["income_cents"] == 320000
+    assert january["expense_cents"] == 110000 + 8100
+    assert january["net_cents"] == 320000 - 118100
+
+
+def test_resolve_year(two_years):
+    with db.session(two_years) as conn:
+        assert web.resolve_year(conn, None) == (2026, [2026, 2025])
+        assert web.resolve_year(conn, "2025")[0] == 2025
+        year, years = web.resolve_year(conn, "2019")
+        assert year == 2019 and 2019 in years
+
+
+def test_resolve_year_on_an_empty_database(tmp_path):
+    with db.session(tmp_path / "empty.db") as conn:
+        year, years = web.resolve_year(conn, None)
+        assert year in years

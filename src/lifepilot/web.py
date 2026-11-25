@@ -120,6 +120,90 @@ def transactions_html(
     )
 
 
+def resolve_year(conn: sqlite3.Connection, requested: str | None) -> tuple[int, list[int]]:
+    """Pick the year to show, and the list offered in the filter."""
+    years = reports.available_years(conn)
+    if requested:
+        try:
+            year = int(requested)
+            reports.year_bounds(year)
+        except ValueError:
+            year = None
+    else:
+        year = None
+    if year is None:
+        year = years[0] if years else reports.current_year()
+    if year not in years:
+        years = sorted({*years, year}, reverse=True)
+    return year, years
+
+
+def year_html(conn: sqlite3.Connection, requested: str | None) -> str:
+    year, years = resolve_year(conn, requested)
+    start, end = reports.year_bounds(year)
+    series = reports.month_series(conn, year)
+    totals = reports.yearly_summaries(conn)
+    by_year = dict(totals)
+    return render.year_page(
+        year=year,
+        years=years,
+        summary=reports.summary(conn, start=start, end=end),
+        previous=by_year.get(year - 1),
+        series=series,
+        previous_series=reports.month_series(conn, year - 1),
+        average=reports.month_average(series),
+        categories=reports.by_category(conn, start=start, end=end),
+        totals=totals,
+    )
+
+
+def year_json(conn: sqlite3.Connection, requested: str | None) -> dict:
+    """Yearly trends as data: monthly series, the prior year, and year totals."""
+    year, _ = resolve_year(conn, requested)
+    start, end = reports.year_bounds(year)
+    series = reports.month_series(conn, year)
+    previous = reports.month_series(conn, year - 1)
+    summary = reports.summary(conn, start=start, end=end)
+
+    def months(data):
+        return [
+            None
+            if s is None
+            else {
+                "month": f"{year:04d}-{i + 1:02d}",
+                "income_cents": s.income_cents,
+                "expense_cents": s.expense_cents,
+                "net_cents": s.net_cents,
+                "transactions": s.count,
+            }
+            for i, s in enumerate(data)
+        ]
+
+    return {
+        "year": year,
+        "summary": {
+            "income_cents": summary.income_cents,
+            "expense_cents": summary.expense_cents,
+            "net_cents": summary.net_cents,
+            "savings_rate": round(summary.savings_rate, 4),
+            "transactions": summary.count,
+        },
+        "average_monthly_spend_cents": reports.month_average(series),
+        "months": months(series),
+        "previous_year": {"year": year - 1, "months": months(previous)},
+        "categories": [
+            {"category": t.category, "total_cents": t.total_cents, "count": t.count,
+             "share": round(t.share, 4)}
+            for t in reports.by_category(conn, start=start, end=end)
+        ],
+        "years": [
+            {"year": y, "income_cents": v.income_cents, "expense_cents": v.expense_cents,
+             "net_cents": v.net_cents, "transactions": v.count}
+            for y, v in reports.yearly_summaries(conn)
+        ],
+    }
+
+
 def report_json(conn: sqlite3.Connection, requested: str | None) -> dict:
     """The same numbers the dashboard shows, for scripting against."""
     month, _ = resolve_month(conn, requested)
@@ -205,12 +289,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._respond_html(html, body_wanted=body_wanted)
                 return
 
+            if route == "/year":
+                with db.session(self.db_path) as conn:
+                    html = year_html(conn, first("year") or None)
+                self._respond_html(html, body_wanted=body_wanted)
+                return
+
             if route == "/transactions":
                 with db.session(self.db_path) as conn:
                     html = transactions_html(
                         conn, first("month") or None, first("category"), first("q")
                     )
                 self._respond_html(html, body_wanted=body_wanted)
+                return
+
+            if route == "/api/year":
+                with db.session(self.db_path) as conn:
+                    payload = year_json(conn, first("year") or None)
+                body = json.dumps(payload, indent=2).encode("utf-8")
+                self._respond(
+                    HTTPStatus.OK, body, "application/json; charset=utf-8",
+                    body_wanted=body_wanted,
+                )
                 return
 
             if route == "/api/report":

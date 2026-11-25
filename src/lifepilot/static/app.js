@@ -54,18 +54,56 @@
     place(x, y);
   }
 
+  // --- crosshair --------------------------------------------------------
+  // Line charts get a hairline that snaps to the hovered month, plus a dot on
+  // each series. It is driven by the same full-height hit bands that carry the
+  // tooltip, so pointer and keyboard both land on it and nobody has to aim at
+  // a 2px line.
+
+  function moveCrosshair(mark) {
+    var chart = mark.ownerSVGElement;
+    if (!chart || mark.getAttribute("data-cx") === null) {
+      return;
+    }
+    var x = mark.getAttribute("data-cx");
+    var line = chart.querySelector(".crosshair-line");
+    if (line) {
+      line.setAttribute("x1", x);
+      line.setAttribute("x2", x);
+    }
+    chart.querySelectorAll(".crosshair-dot").forEach(function (dot) {
+      var y = mark.getAttribute("data-cy-" + dot.getAttribute("data-dot"));
+      dot.setAttribute("cx", x);
+      dot.setAttribute("cy", y === null ? "0" : y);
+      // A month with no value for that series gets no dot.
+      dot.setAttribute("r", y === null ? "0" : "4.5");
+    });
+    chart.classList.add("crosshair-on");
+  }
+
+  function clearCrosshairs() {
+    document.querySelectorAll(".chart.crosshair-on").forEach(function (chart) {
+      chart.classList.remove("crosshair-on");
+    });
+  }
+
   var SELECTOR = "[data-label]";
 
   document.addEventListener("pointermove", function (event) {
     var mark = event.target.closest ? event.target.closest(SELECTOR) : null;
     if (mark) {
       show(mark, event.clientX, event.clientY);
+      moveCrosshair(mark);
     } else {
       hide();
+      clearCrosshairs();
     }
   });
 
-  document.addEventListener("pointerleave", hide);
+  document.addEventListener("pointerleave", function () {
+    hide();
+    clearCrosshairs();
+  });
   window.addEventListener("scroll", hide, { passive: true });
 
   // Keyboard focus gets the same readout as hover.
@@ -78,14 +116,19 @@
       }
       var box = mark.getBoundingClientRect();
       show(mark, box.left + box.width / 2, box.top);
+      moveCrosshair(mark);
     },
     true
   );
 
-  document.addEventListener("blur", hide, true);
+  document.addEventListener("blur", function () {
+    hide();
+    clearCrosshairs();
+  }, true);
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
       hide();
+      clearCrosshairs();
     }
   });
 

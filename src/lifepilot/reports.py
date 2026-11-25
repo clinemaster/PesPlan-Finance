@@ -217,3 +217,103 @@ def budget_report(conn: sqlite3.Connection, month: str) -> list[BudgetLine]:
     ]
     lines.sort(key=lambda line: line.used_share, reverse=True)
     return lines
+
+
+# --- yearly ---------------------------------------------------------------
+
+
+def year_bounds(year: int) -> tuple[str, str]:
+    """Inclusive ISO date bounds for a calendar year."""
+    year = int(year)
+    if not 1 <= year <= 9999:
+        raise ValueError(f"year out of range: {year}")
+    return f"{year:04d}-01-01", f"{year:04d}-12-31"
+
+
+def current_year() -> int:
+    return Date.today().year
+
+
+def available_years(conn: sqlite3.Connection) -> list[int]:
+    """Years that have transactions, newest first."""
+    rows = conn.execute(
+        "SELECT DISTINCT substr(date, 1, 4) AS year FROM transactions ORDER BY year DESC"
+    ).fetchall()
+    return [int(row["year"]) for row in rows]
+
+
+def month_series(
+    conn: sqlite3.Connection,
+    year: int,
+    *,
+    exclude_categories: tuple[str, ...] = ("transfers",),
+) -> list[Summary | None]:
+    """Twelve slots, January to December, for one calendar year.
+
+    A month with no transactions is None rather than a zeroed Summary: plotting
+    an untouched month as 0.00 would claim you spent nothing, which is a
+    different statement from having no records - and it would drag a trend line
+    down to the axis for every month still in the future.
+    """
+    start, end = year_bounds(year)
+    clause, params = "", [start, end]
+    if exclude_categories:
+        placeholders = ",".join("?" for _ in exclude_categories)
+        clause = f" AND category NOT IN ({placeholders})"
+        params.extend(exclude_categories)
+
+    rows = conn.execute(
+        f"""SELECT substr(date, 1, 7) AS month,
+                   COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents END), 0)  AS income,
+                   COALESCE(SUM(CASE WHEN amount_cents < 0 THEN -amount_cents END), 0) AS expense,
+                   COUNT(*) AS n
+            FROM transactions
+            WHERE date BETWEEN ? AND ?{clause}
+            GROUP BY month""",
+        params,
+    ).fetchall()
+
+    found = {
+        row["month"]: Summary(
+            income_cents=row["income"], expense_cents=row["expense"], count=row["n"]
+        )
+        for row in rows
+    }
+    return [found.get(f"{int(year):04d}-{month:02d}") for month in range(1, 13)]
+
+
+def yearly_summaries(
+    conn: sqlite3.Connection,
+    *,
+    exclude_categories: tuple[str, ...] = ("transfers",),
+) -> list[tuple[int, Summary]]:
+    """One summary per year with activity, oldest first."""
+    clause, params = "", []
+    if exclude_categories:
+        placeholders = ",".join("?" for _ in exclude_categories)
+        clause = f" WHERE category NOT IN ({placeholders})"
+        params.extend(exclude_categories)
+
+    rows = conn.execute(
+        f"""SELECT substr(date, 1, 4) AS year,
+                   COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents END), 0)  AS income,
+                   COALESCE(SUM(CASE WHEN amount_cents < 0 THEN -amount_cents END), 0) AS expense,
+                   COUNT(*) AS n
+            FROM transactions{clause}
+            GROUP BY year
+            ORDER BY year""",
+        params,
+    ).fetchall()
+    return [
+        (
+            int(row["year"]),
+            Summary(income_cents=row["income"], expense_cents=row["expense"], count=row["n"]),
+        )
+        for row in rows
+    ]
+
+
+def month_average(series: list[Summary | None]) -> int:
+    """Mean monthly spend across the months that have records."""
+    spends = [s.expense_cents for s in series if s is not None]
+    return round(sum(spends) / len(spends)) if spends else 0

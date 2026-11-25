@@ -129,3 +129,34 @@ def test_bad_month_is_an_error(db_path, capsys):
     run(db_path, "init")
     assert run(db_path, "report", "summary", "--month", "nope") == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_report_year(db_path, capsys):
+    run(db_path, "init")
+    run(db_path, "add", "ACME PAYROLL", "3200.00", "--date", "2026-08-01")
+    run(db_path, "add", "TESCO", "-120.00", "--date", "2026-08-05")
+    run(db_path, "add", "TESCO", "-150.00", "--date", "2026-11-05")
+    assert run(db_path, "report", "year", "--year", "2026") == 0
+    out = capsys.readouterr().out
+    assert "Year 2026" in out
+    assert "Spending by month" in out
+    assert "avg 135.00/month" in out  # mean of the two months that have records
+    assert "Aug" in out and "Nov" in out
+    assert "All years" not in out  # only one year of data
+
+
+def test_report_year_compares_against_the_prior_year(db_path, capsys):
+    run(db_path, "init")
+    run(db_path, "add", "TESCO", "-100.00", "--date", "2025-03-05")
+    run(db_path, "add", "TESCO", "-130.00", "--date", "2026-03-05")
+    assert run(db_path, "report", "year", "--year", "2026") == 0
+    out = capsys.readouterr().out
+    assert "VS 2025" in out
+    assert "30.00" in out  # spent 30 more in March than the year before
+    assert "All years" in out
+
+
+def test_report_year_with_no_data(db_path, capsys):
+    run(db_path, "init")
+    assert run(db_path, "report", "year", "--year", "2019") == 0
+    assert "Year 2019" in capsys.readouterr().out

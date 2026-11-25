@@ -10,7 +10,7 @@ import sqlite3
 import sys
 from datetime import date as Date
 
-from . import categorize, db, importers, reports, web
+from . import categorize, db, importers, render, reports, web
 from .models import UNCATEGORIZED, Budget, Rule, Transaction, parse_date
 from .money import format_money, parse_money
 
@@ -286,6 +286,60 @@ def cmd_report(args: argparse.Namespace, conn: sqlite3.Connection) -> int:
         print(_table(["MONTH", "INCOME", "EXPENSES", "NET"], rows, right={1, 2, 3}))
         return 0
 
+    if args.report_action == "year":
+        year = args.year or reports.current_year()
+        start, end = reports.year_bounds(year)
+        s = reports.summary(conn, start=start, end=end)
+        print(f"Year {year}")
+        print(f"  Income    {format_money(s.income_cents):>14}")
+        print(f"  Spent     {format_money(s.expense_cents):>14}")
+        print(f"  Net       {format_money(s.net_cents):>14}")
+        if s.income_cents > 0:
+            print(f"  Saved     {s.savings_rate:>13.1%}")
+        print(f"  ({s.count} transaction(s); transfers excluded)\n")
+
+        series = reports.month_series(conn, year)
+        previous = reports.month_series(conn, year - 1)
+        average = reports.month_average(series)
+        biggest = max((m.expense_cents for m in series if m), default=0)
+        rows = []
+        for index, month in enumerate(series):
+            label = render.MONTH_ABBR[index]
+            if month is None:
+                rows.append([label, "-", "", "-"])
+                continue
+            prior = previous[index]
+            change = (
+                format_money(month.expense_cents - prior.expense_cents)
+                if prior is not None
+                else "-"
+            )
+            share = month.expense_cents / biggest if biggest else 0
+            rows.append([label, format_money(month.expense_cents), _bar(share), change])
+        print(f"Spending by month (avg {format_money(average)}/month)")
+        print(_table(["MONTH", "SPENT", "", f"VS {year - 1}"], rows, right={1, 3}))
+
+        totals = reports.yearly_summaries(conn)
+        if len(totals) > 1:
+            print("\nAll years")
+            print(
+                _table(
+                    ["YEAR", "INCOME", "SPENT", "NET", "SAVED"],
+                    [
+                        [
+                            str(y),
+                            format_money(v.income_cents),
+                            format_money(v.expense_cents),
+                            format_money(v.net_cents),
+                            f"{v.savings_rate:.1%}" if v.income_cents > 0 else "n/a",
+                        ]
+                        for y, v in reversed(totals)
+                    ],
+                    right={1, 2, 3, 4},
+                )
+            )
+        return 0
+
     if args.report_action == "budget":
         month = args.month or reports.current_month()
         lines = reports.budget_report(conn, month)
@@ -412,6 +466,8 @@ def build_parser() -> argparse.ArgumentParser:
     rcat.add_argument("--income", action="store_true", help="break down income instead of spending")
     rtr = rpsub.add_parser("trend", help="month-by-month totals")
     rtr.add_argument("--months", type=int, default=6)
+    ryr = rpsub.add_parser("year", help="yearly spending trends, month by month")
+    ryr.add_argument("--year", type=int, help="default: this year")
     rbud = rpsub.add_parser("budget", help="budget vs actual for a month")
     rbud.add_argument("--month", help="default: this month")
     p.set_defaults(func=cmd_report)

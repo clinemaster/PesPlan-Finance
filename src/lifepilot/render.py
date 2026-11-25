@@ -79,6 +79,7 @@ def nice_ticks(max_cents: int, count: int = 4) -> list[int]:
 def page(*, title: str, body: str, active: str = "") -> str:
     links = (
         ("dashboard", "/", "Dashboard"),
+        ("year", "/year", "Year"),
         ("transactions", "/transactions", "Transactions"),
     )
     current = ' class="current" aria-current="page"'
@@ -200,7 +201,7 @@ def category_chart(totals: list[CategoryTotal], *, month: str, limit: int = 12) 
              data-value="{esc(format_money(t.total_cents))}"
              data-extra="{esc(f'{t.share:.1%} of spending · {t.count} transaction(s)')}">
       <span class="bar-name">{esc(t.category)}</span>
-      <span class="bar-track"><span class="bar-fill" style="width:{t.total_cents / biggest:.4%}"></span></span>
+      <span class="bar-track"><span class="bar-fill series-2" style="width:{t.total_cents / biggest:.4%}"></span></span>
       <span class="bar-value">{esc(format_money(t.total_cents))}</span>
     </div>"""
         for t in shown
@@ -289,8 +290,9 @@ def trend_chart(trend: list[tuple[str, Summary]]) -> str:
         )
         # Hit target spans the whole month band, so the pointer never has to
         # land on a 24px column; one tooltip reports every series.
+        band_x, band_w = _band_edges(left, band, index)
         marks.append(
-            f'<rect class="hit" x="{left + band * index:.1f}" y="{top}" width="{band:.1f}" '
+            f'<rect class="hit" x="{band_x}" y="{top}" width="{band_w}" '
             f'height="{plot_h}" tabindex="0" data-label="{esc(month_label(month))}" '
             f'data-value="{esc(format_money(s.net_cents))} net" '
             f'data-extra="Income {esc(format_money(s.income_cents))} · '
@@ -322,6 +324,17 @@ def trend_chart(trend: list[tuple[str, Summary]]) -> str:
   </svg>
   {table}
 </section>"""
+
+
+def _band_edges(left: float, band: float, index: int) -> tuple[float, float]:
+    """x and width for one band, rounded so neighbours share an exact seam.
+
+    Rounding x and width independently leaves sub-pixel overlaps or gaps
+    between hit targets; deriving the width from two rounded edges does not.
+    """
+    start = round(left + band * index, 1)
+    end = round(left + band * (index + 1), 1)
+    return start, round(end - start, 1)
 
 
 def _column_path(x: float, y: float, w: float, h: float, r: float = 4.0) -> str:
@@ -548,3 +561,430 @@ def error_page(status: int, message: str) -> str:
 
 def today_month() -> str:
     return Date.today().strftime("%Y-%m")
+
+
+# --- yearly charts --------------------------------------------------------
+#
+# Two conventions hold across every chart in the app:
+#
+#   * Income is always series-1 (blue) and spending always series-2 (orange).
+#     Color follows the entity, so a reader who learns "orange is what I spent"
+#     on one chart is never shown spending in another color on the next.
+#   * Last year is drawn in the de-emphasis gray, not a third hue. The current
+#     year is the point and the prior year is context, which is the emphasis
+#     form - and it keeps blue free to mean income only.
+#
+#     Do not "fix" that gray into a hue. Measured against the spending orange it
+#     separates by CVD delta-E 9.8 light / 11.3 dark (>= 8 wanted) and 17.6 / 16.7
+#     for normal vision (>= 15), both clear of the floors, and each clears 3:1
+#     against its surface. A chroma check would fail it, but that check grades
+#     categorical palettes - sets of equal, competing series - and this is one
+#     accent against context, where the absence of chroma is the whole point.
+
+MONTH_ABBR = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+# Shared plot box for the yearly charts.
+_W, _H = 760, 260
+_LEFT, _RIGHT, _TOP, _BOTTOM = 58, 20, 26, 34
+_PLOT_W = _W - _LEFT - _RIGHT
+_PLOT_H = _H - _TOP - _BOTTOM
+
+
+def _scaler(peak: int):
+    """Return (ticks, y_of) for a 0..peak value axis."""
+    ticks = nice_ticks(max(peak, 1))
+    scale_max = ticks[-1] or 1
+
+    def y_of(cents: int) -> float:
+        return _TOP + _PLOT_H - (cents / scale_max) * _PLOT_H
+
+    return ticks, y_of
+
+
+def _grid(ticks: list[int], y_of) -> str:
+    return "".join(
+        f'<line class="grid" x1="{_LEFT}" y1="{y_of(t):.1f}" '
+        f'x2="{_LEFT + _PLOT_W}" y2="{y_of(t):.1f}"/>'
+        f'<text class="tick" x="{_LEFT - 8}" y="{y_of(t) + 4:.1f}" '
+        f'text-anchor="end">{esc(_axis_label(t))}</text>'
+        for t in ticks
+    )
+
+
+def _month_ticks(band: float) -> str:
+    return "".join(
+        f'<text class="tick" x="{_LEFT + band * (i + 0.5):.1f}" y="{_TOP + _PLOT_H + 20}" '
+        f'text-anchor="middle">{MONTH_ABBR[i]}</text>'
+        for i in range(12)
+    )
+
+
+def _month_extra(s: Summary | None) -> str:
+    if s is None:
+        return "no transactions recorded"
+    return (
+        f"Income {format_money(s.income_cents)} \u00b7 net {format_money(s.net_cents)} "
+        f"\u00b7 {s.count} transaction(s)"
+    )
+
+
+def monthly_spend_chart(year: int, series: list[Summary | None], *, average: int) -> str:
+    """Spending month by month through one calendar year.
+
+    One series, so one color and no legend. Months without records draw no
+    column at all rather than a zero-height one, so an untouched month is never
+    mistaken for a month you spent nothing in.
+    """
+    if all(s is None for s in series):
+        return _empty_card("Spending by month", f"No transactions recorded in {year}.")
+
+    peak = max([s.expense_cents for s in series if s] + [average, 1])
+    ticks, y_of = _scaler(peak)
+    band = _PLOT_W / 12
+    bar_w = min(24.0, band * 0.52)
+
+    marks: list[str] = []
+    biggest = max((s.expense_cents for s in series if s), default=0)
+    for index, s in enumerate(series):
+        center = _LEFT + band * (index + 0.5)
+        if s is not None and s.expense_cents > 0:
+            x = center - bar_w / 2
+            height = (s.expense_cents / (ticks[-1] or 1)) * _PLOT_H
+            marks.append(
+                f'<path class="col series-2" d="{_column_path(x, y_of(s.expense_cents), bar_w, height)}"/>'
+            )
+            # Label only the peak month - a number on every column goes unread.
+            if s.expense_cents == biggest and y_of(s.expense_cents) - _TOP > 12:
+                marks.append(
+                    f'<text class="col-label" x="{center:.1f}" '
+                    f'y="{y_of(s.expense_cents) - 7:.1f}" text-anchor="middle">'
+                    f"{esc(_axis_label(s.expense_cents))}</text>"
+                )
+        band_x, band_w = _band_edges(_LEFT, band, index)
+        marks.append(
+            f'<rect class="hit" x="{band_x}" y="{_TOP}" '
+            f'width="{band_w}" height="{_PLOT_H}" tabindex="0" '
+            f'data-label="{MONTH_ABBR[index]} {year}" '
+            f'data-value="{esc(format_money(s.expense_cents) if s else "no data")}" '
+            f'data-extra="{esc(_month_extra(s))}"/>'
+        )
+
+    # The average is an annotation, not a gridline: solid hairline, labelled.
+    average_line = ""
+    if average > 0:
+        y = y_of(average)
+        average_line = (
+            f'<line class="reference" x1="{_LEFT}" y1="{y:.1f}" '
+            f'x2="{_LEFT + _PLOT_W}" y2="{y:.1f}"/>'
+            f'<text class="reference-label" x="{_LEFT + _PLOT_W}" y="{y - 6:.1f}" '
+            f'text-anchor="end">avg {esc(_axis_label(average))}</text>'
+        )
+
+    rows = "".join(
+        f"<tr><td>{MONTH_ABBR[i]} {year}</td>"
+        f'<td class="num">{esc(format_money(s.expense_cents)) if s else "&#8212;"}</td>'
+        f'<td class="num">{esc(format_money(s.income_cents)) if s else "&#8212;"}</td>'
+        f'<td class="num">{esc(format_money(s.net_cents)) if s else "&#8212;"}</td></tr>'
+        for i, s in enumerate(series)
+    )
+
+    return f"""<section class="card">
+  {_card_head("Spending by month", str(year), "year-months-table")}
+  <svg class="chart" viewBox="0 0 {_W} {_H}" role="img"
+       aria-label="Spending for each month of {year}. The table view lists every value.">
+    {_grid(ticks, y_of)}
+    <line class="axis" x1="{_LEFT}" y1="{_TOP + _PLOT_H}" x2="{_LEFT + _PLOT_W}" y2="{_TOP + _PLOT_H}"/>
+    {average_line}
+    {"".join(marks)}
+    {_month_ticks(band)}
+  </svg>
+  {_table_view("year-months-table", ["Month", "Spent", "Income", "Net"], rows)}
+</section>"""
+
+
+def _line_path(points: list[tuple[float, float] | None]) -> str:
+    """A polyline that breaks at missing months instead of interpolating."""
+    parts: list[str] = []
+    pen_down = False
+    for point in points:
+        if point is None:
+            pen_down = False
+            continue
+        command = "L" if pen_down else "M"
+        parts.append(f"{command}{point[0]:.1f},{point[1]:.1f}")
+        pen_down = True
+    return " ".join(parts)
+
+
+def _isolated(points: list[tuple[float, float] | None]) -> list[tuple[float, float]]:
+    """Points with no neighbour to connect to - a stroke alone would draw nothing."""
+    out = []
+    for i, point in enumerate(points):
+        if point is None:
+            continue
+        before = points[i - 1] if i else None
+        after = points[i + 1] if i + 1 < len(points) else None
+        if before is None and after is None:
+            out.append(point)
+    return out
+
+
+def year_over_year_chart(
+    *,
+    year: int,
+    series: list[Summary | None],
+    previous_year: int,
+    previous_series: list[Summary | None],
+) -> str:
+    """This year's spending against last year's, month by month.
+
+    Lines, because the shape across the year is the point. The prior year is
+    drawn in the de-emphasis gray: it is context for the current year, not a
+    second thing of equal weight.
+    """
+    has_previous = any(s is not None for s in previous_series)
+    if all(s is None for s in series) and not has_previous:
+        return _empty_card("Year over year", f"No transactions recorded in {year}.")
+
+    peak = max(
+        [s.expense_cents for s in series if s]
+        + [s.expense_cents for s in previous_series if s]
+        + [1]
+    )
+    ticks, y_of = _scaler(peak)
+    band = _PLOT_W / 12
+
+    def points(data: list[Summary | None]) -> list[tuple[float, float] | None]:
+        return [
+            (_LEFT + band * (i + 0.5), y_of(s.expense_cents)) if s is not None else None
+            for i, s in enumerate(data)
+        ]
+
+    current_points = points(series)
+    previous_points = points(previous_series)
+
+    lines = ""
+    if has_previous:
+        lines += f'<path class="line series-context" d="{_line_path(previous_points)}"/>'
+    lines += f'<path class="line series-2" d="{_line_path(current_points)}"/>'
+
+    # End markers, plus a marker for any month that stands alone.
+    markers = ""
+    ends: dict[str, tuple[float, float]] = {}
+    for name, pts, css in (
+        ("previous", previous_points, "series-context"),
+        ("current", current_points, "series-2"),
+    ):
+        live = [p for p in pts if p is not None]
+        if not live:
+            continue
+        ends[name] = live[-1]
+        for x, y in {*(_isolated(pts)), live[-1]}:
+            markers += f'<circle class="marker {css}" cx="{x:.1f}" cy="{y:.1f}" r="4.5"/>'
+
+    # Direct end labels, but only when they cannot collide. Nudging them apart
+    # would detach each label from its line, so the legend and tooltip carry it
+    # instead when the two ends are close.
+    labels = ""
+    separated = (
+        "current" in ends
+        and "previous" in ends
+        and (
+            abs(ends["current"][1] - ends["previous"][1]) >= 14
+            or abs(ends["current"][0] - ends["previous"][0]) >= 40
+        )
+    )
+    if separated or len(ends) == 1:
+        for name, (x, y) in ends.items():
+            anchor = "end" if x > _LEFT + _PLOT_W - 40 else "start"
+            dx = -8 if anchor == "end" else 8
+            label = str(year if name == "current" else previous_year)
+            labels += (
+                f'<text class="end-label" x="{x + dx:.1f}" y="{y - 8:.1f}" '
+                f'text-anchor="{anchor}">{esc(label)}</text>'
+            )
+
+    # Hit bands drive both the tooltip and the crosshair; they are the full
+    # height of the plot, so the pointer never has to find a 2px line.
+    bands = ""
+    for index in range(12):
+        current, prior = series[index], previous_series[index]
+        if current is None and prior is None:
+            value = "no data"
+        elif current is None:
+            value = f"{format_money(prior.expense_cents)} in {previous_year}"
+        else:
+            value = format_money(current.expense_cents)
+        extra_parts = []
+        if prior is not None:
+            extra_parts.append(f"{previous_year}: {format_money(prior.expense_cents)}")
+        if current is not None and prior is not None:
+            change = current.expense_cents - prior.expense_cents
+            sign = "+" if change > 0 else ""
+            extra_parts.append(f"{sign}{format_money(change)} year on year")
+        cx = _LEFT + band * (index + 0.5)
+        dots = ""
+        if current is not None:
+            dots += f' data-cy-current="{y_of(current.expense_cents):.1f}"'
+        if prior is not None:
+            dots += f' data-cy-previous="{y_of(prior.expense_cents):.1f}"'
+        band_x, band_w = _band_edges(_LEFT, band, index)
+        bands += (
+            f'<rect class="hit" x="{band_x}" y="{_TOP}" '
+            f'width="{band_w}" height="{_PLOT_H}" tabindex="0" '
+            f'data-label="{MONTH_ABBR[index]} {year}" data-value="{esc(value)}" '
+            f'data-extra="{esc(" \u00b7 ".join(extra_parts))}" data-cx="{cx:.1f}"{dots}/>'
+        )
+
+    rows = "".join(
+        f"<tr><td>{MONTH_ABBR[i]}</td>"
+        f'<td class="num">{esc(format_money(series[i].expense_cents)) if series[i] else "&#8212;"}</td>'
+        f'<td class="num">{esc(format_money(previous_series[i].expense_cents)) if previous_series[i] else "&#8212;"}</td>'
+        f'<td class="num">{esc(_yoy_change(series[i], previous_series[i]))}</td></tr>'
+        for i in range(12)
+    )
+
+    return f"""<section class="card">
+  {_card_head("Year over year", f"{year} against {previous_year}", "year-yoy-table")}
+  <p class="legend">
+    <span class="key"><span class="stroke series-2"></span>{year}</span>
+    <span class="key"><span class="stroke series-context"></span>{previous_year}</span>
+  </p>
+  <svg class="chart" viewBox="0 0 {_W} {_H}" role="img"
+       aria-label="Monthly spending in {year} compared with {previous_year}. The table view lists every value.">
+    {_grid(ticks, y_of)}
+    <line class="axis" x1="{_LEFT}" y1="{_TOP + _PLOT_H}" x2="{_LEFT + _PLOT_W}" y2="{_TOP + _PLOT_H}"/>
+    <g class="crosshair">
+      <line class="crosshair-line" x1="0" y1="{_TOP}" x2="0" y2="{_TOP + _PLOT_H}"/>
+      <circle class="crosshair-dot series-2" data-dot="current" cx="0" cy="0" r="0"/>
+      <circle class="crosshair-dot series-context" data-dot="previous" cx="0" cy="0" r="0"/>
+    </g>
+    {lines}
+    {markers}
+    {labels}
+    {bands}
+    {_month_ticks(band)}
+  </svg>
+  {_table_view("year-yoy-table", ["Month", str(year), str(previous_year), "Change"], rows)}
+</section>"""
+
+
+def _yoy_change(current: Summary | None, prior: Summary | None) -> str:
+    if current is None or prior is None:
+        return "\u2014"
+    change = current.expense_cents - prior.expense_cents
+    sign = "+" if change > 0 else ""
+    return f"{sign}{format_money(change)}"
+
+
+def year_filter(*, year: int, years: list[int]) -> str:
+    options = "".join(
+        f'<option value="{y}"{" selected" if y == year else ""}>{y}</option>' for y in years
+    )
+    return f"""<form class="filters" method="get" action="/year">
+  <label for="year">Year</label>
+  <select id="year" name="year" data-autosubmit>{options}</select>
+  <button type="submit" class="ghost-btn">Apply</button>
+</form>"""
+
+
+def year_headline(*, year: int, summary: Summary, previous: Summary | None) -> str:
+    """Hero figure is the year's spending - this page is about spending."""
+    tiles = [
+        ("Income", format_money(summary.income_cents)),
+        ("Net", format_money(summary.net_cents)),
+        ("Saved", f"{summary.savings_rate:.1%}" if summary.income_cents > 0 else "n/a"),
+        ("Transactions", f"{summary.count:,}"),
+    ]
+    tile_html = "".join(
+        f'<div class="tile"><p class="tile-label">{esc(label)}</p>'
+        f'<p class="tile-value">{esc(value)}</p></div>'
+        for label, value in tiles
+    )
+    # For spending, up is bad - so the delta's direction is inverted.
+    delta = '<p class="delta delta-flat">no prior year to compare</p>'
+    if previous is not None:
+        change = summary.expense_cents - previous.expense_cents
+        if change == 0:
+            delta = '<p class="delta delta-flat">&#8212; unchanged vs last year</p>'
+        else:
+            arrow = "&#9650;" if change > 0 else "&#9660;"
+            word = "up" if change > 0 else "down"
+            cls = "delta-bad" if change > 0 else "delta-good"
+            delta = (
+                f'<p class="delta {cls}">{arrow} {word} {esc(format_money(abs(change)))} '
+                f"vs {previous_year_of(year)}</p>"
+            )
+    return f"""<section class="headline">
+  <div class="card hero">
+    <p class="tile-label">Spent in {year}</p>
+    <p class="hero-value">{esc(format_money(summary.expense_cents))}</p>
+    {delta}
+    <p class="note">Transfers between your own accounts are excluded.</p>
+  </div>
+  <div class="card tiles">{tile_html}</div>
+</section>"""
+
+
+def previous_year_of(year: int) -> int:
+    return int(year) - 1
+
+
+def year_totals_table(rows: list[tuple[int, Summary]]) -> str:
+    """Every year side by side - the plain-text companion to the charts."""
+    if not rows:
+        return ""
+    body = "".join(
+        f"<tr><td>{y}</td>"
+        f'<td class="num">{esc(format_money(s.income_cents))}</td>'
+        f'<td class="num">{esc(format_money(s.expense_cents))}</td>'
+        f'<td class="num">{esc(format_money(s.net_cents))}</td>'
+        f'<td class="num">{s.savings_rate:.1%}</td>'
+        f'<td class="num">{s.count:,}</td></tr>'
+        for y, s in reversed(rows)
+    )
+    return f"""<section class="card">
+  {_card_head("All years", f"{len(rows)} year(s) with activity")}
+  <div class="scroll-x">
+    <table class="data">
+      <thead><tr><th>Year</th><th class="num">Income</th><th class="num">Spent</th>
+        <th class="num">Net</th><th class="num">Saved</th><th class="num">Transactions</th></tr></thead>
+      <tbody>{body}</tbody>
+    </table>
+  </div>
+</section>"""
+
+
+def year_page(
+    *,
+    year: int,
+    years: list[int],
+    summary: Summary,
+    previous: Summary | None,
+    series: list[Summary | None],
+    previous_series: list[Summary | None],
+    average: int,
+    categories: list[CategoryTotal],
+    totals: list[tuple[int, Summary]],
+) -> str:
+    body = "\n".join(
+        [
+            year_filter(year=year, years=years),
+            year_headline(year=year, summary=summary, previous=previous),
+            monthly_spend_chart(year, series, average=average),
+            year_over_year_chart(
+                year=year,
+                series=series,
+                previous_year=previous_year_of(year),
+                previous_series=previous_series,
+            ),
+            category_chart(categories, month=str(year)),
+            year_totals_table(totals),
+        ]
+    )
+    return page(title=f"{year} &middot; yearly trends", body=body, active="year")
+
+
+def today_year() -> int:
+    return Date.today().year

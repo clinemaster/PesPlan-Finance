@@ -20,7 +20,8 @@
   --border: rgba(11, 11, 11, 0.10);
 
   --series-1: #2a78d6;         /* income / magnitude */
-  --series-2: #eb6834;         /* expenses */
+  --series-2: #eb6834;         /* expenses / spending */
+  --series-context: #898781;   /* de-emphasis: last year */
 
   --status-good: #0ca30c;
   --status-warning: #fab219;
@@ -46,6 +47,7 @@
     --border: rgba(255, 255, 255, 0.10);
     --series-1: #3987e5;
     --series-2: #d95926;
+    --series-context: #898781;
     --delta-good: #0ca30c;
   }
 }
@@ -62,6 +64,7 @@
   --border: rgba(255, 255, 255, 0.10);
   --series-1: #3987e5;
   --series-2: #d95926;
+  --series-context: #898781;
   --delta-good: #0ca30c;
 }
 
@@ -288,6 +291,8 @@ main {
   border-radius: 0 4px 4px 0;
 }
 
+.bar-fill.series-2 { background: var(--series-2); }
+
 .bar-value {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -334,6 +339,70 @@ main {
 .swatch { width: 10px; height: 10px; border-radius: 2px; }
 .swatch.series-1 { background: var(--series-1); }
 .swatch.series-2 { background: var(--series-2); }
+
+/* --- lines, markers & reference annotations --------------------------- */
+
+.chart .line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart .line.series-2 { stroke: var(--series-2); }
+.chart .line.series-context { stroke: var(--series-context); }
+
+/* A 2px surface ring keeps markers legible where they cross a line. */
+.chart .marker {
+  stroke: var(--surface-1);
+  stroke-width: 2;
+}
+
+.chart .marker.series-2 { fill: var(--series-2); }
+.chart .marker.series-context { fill: var(--series-context); }
+
+/* Labels wear ink, never the series colour - the marker beside them carries
+   the identity. */
+.chart .end-label {
+  fill: var(--text-secondary);
+  font: 11px var(--sans);
+  font-weight: 500;
+}
+
+/* The average is an annotation, so it is labelled and solid - dashing would
+   read as a projection. */
+.chart .reference { stroke: var(--text-muted); stroke-width: 1; }
+
+.chart .reference-label {
+  fill: var(--text-muted);
+  font: 11px var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- crosshair -------------------------------------------------------- */
+
+.chart .crosshair { opacity: 0; }
+.chart.crosshair-on .crosshair { opacity: 1; }
+
+.chart .crosshair-line { stroke: var(--axis); stroke-width: 1; }
+
+.chart .crosshair-dot {
+  stroke: var(--surface-1);
+  stroke-width: 2;
+}
+
+.chart .crosshair-dot.series-2 { fill: var(--series-2); }
+.chart .crosshair-dot.series-context { fill: var(--series-context); }
+
+/* Legends mirror the mark: a rect for bars, a short stroke for lines. */
+.stroke {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.stroke.series-2 { background: var(--series-2); }
+.stroke.series-context { background: var(--series-context); }
 
 /* --- budget meters ---------------------------------------------------- */
 

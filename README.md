@@ -54,7 +54,7 @@ Summary - 2026-11-01 to 2026-11-30
 | `delete ID` | Delete a transaction |
 | `rules list\|add\|rm\|seed` | Manage categorization rules |
 | `budget list\|set\|rm` | Manage monthly budgets per category |
-| `report summary\|categories\|trend\|budget` | Reports |
+| `report summary\|categories\|trend\|year\|budget` | Reports |
 | `serve` | Browse the reports in a local web UI |
 
 Every command accepts `--db PATH`. Date ranges accept either `--month YYYY-MM` or
@@ -126,8 +126,10 @@ lifepilot serve --open        # http://127.0.0.1:8765/
 | Route | What it shows |
 | --- | --- |
 | `/` | Dashboard: net for the month, income/expenses/savings tiles, spending by category, a 12-month income-vs-expenses chart, budget meters, recent transactions |
+| `/year` | Yearly trends: spending month by month with the year's average, this year against last year, spending by category, and every year side by side |
 | `/transactions` | Full transaction list for a month, filterable by category and description |
-| `/api/report?month=YYYY-MM` | The same numbers as JSON, for scripting |
+| `/api/report?month=YYYY-MM` | The month's numbers as JSON, for scripting |
+| `/api/year?year=YYYY` | The year's monthly series, prior year and totals as JSON |
 
 `--host` (default `127.0.0.1`), `--port` (default `8765`) and `--db` all apply.
 
@@ -151,6 +153,28 @@ Notes on how it behaves:
 The month selector is the only filter and it scopes the whole page. Months come
 from the data, so the picker only offers months you actually have transactions
 in (plus whatever you ask for by URL).
+
+### Yearly trends
+
+```bash
+lifepilot report year --year 2026     # the same thing in the terminal
+```
+
+The `/year` page answers "is this year costing more than last year, and when":
+
+- **Spending by month** - one column per month, with the year's monthly average
+  drawn as a labelled reference line.
+- **Year over year** - this year's monthly spending against last year's.
+- **Spending by category** for the whole year, and a row per year side by side.
+
+A month with no transactions draws no column and breaks the line rather than
+plotting 0.00 - an untouched month is not a month you spent nothing in, and
+zero-filling would drag the line to the axis for every month still to come.
+
+Two conventions hold across every chart: income is always blue and spending
+always orange, so a color never changes meaning between charts; and last year is
+drawn in a de-emphasis gray rather than a third color, because it is context for
+the current year rather than a second thing of equal weight.
 
 ## Notes on the numbers
 
@@ -176,7 +200,7 @@ src/lifepilot/
   web.py          read-only http.server app + JSON endpoint
   render.py       HTML/SVG rendering for the web UI
   static/         app.css, app.js (served by web.py)
-tests/            pytest suite (131 tests)
+tests/            pytest suite (172 tests)
 sample_data/      an example CSV export
 data/             your database lives here (gitignored)
 ```
