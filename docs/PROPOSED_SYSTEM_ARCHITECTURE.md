@@ -166,7 +166,7 @@ The architecture must work in three situations without code changes — only con
 ```
 No API, no network exposure. This must keep working exactly as it does now.
 
-### 5.2 Home network (the first mobile target)
+### 5.2 Home server — **the chosen deployment (decided 2026-11-26)**
 
 ```
   ┌──────── home server / desktop ────────┐        ┌──────────────┐
@@ -184,6 +184,26 @@ Requirements this introduces:
   (Caddy/nginx); the application speaks plain HTTP on loopback behind it.
 - **Token authentication** on every API request (F2).
 - **WAL mode** so the browser and the phone can read while a write is in flight (D2).
+- **The home server owns the database.** `data/finance.db` lives there and nowhere else; the
+  desktop CLI becomes a client of the same machine, or is used over SSH. Two copies of the
+  file on two machines is the one topology to avoid — SQLite has no replication, and the
+  fingerprint deduplication only protects against duplicate *rows*, not divergent files.
+
+#### The unresolved half: reaching it from outside the house
+
+A home server answers *where the data lives*. It does not answer **how the phone reaches it
+when the user is not at home**, and that is the question that actually shapes the security
+design. The realistic options, in the order I would consider them:
+
+| Option | TLS story | Exposure | Verdict |
+|---|---|---|---|
+| **VPN (WireGuard / Tailscale)** | A private cert, or plain HTTP inside the tunnel | Nothing published to the internet | **Recommended.** The phone joins the home network from anywhere; no inbound port, no public DNS, no certificate renewal on a dynamic IP. The smallest attack surface by a wide margin |
+| **Port-forward + dynamic DNS + Let's Encrypt** | Public cert, auto-renewed | The API is on the public internet, protected by one bearer token | Workable, but it puts a single-token financial API on the open internet and needs DNS-01 renewal if inbound :80 is unavailable |
+| **LAN-only** | Private cert or plain HTTP on the LAN | None | Simplest, but the app only works at home, which defeats much of the point of a phone client |
+
+**This needs an answer before the auth work in Phase 03 step 3**, because it decides whether
+the token is the only thing between the internet and the ledger (port-forward) or a second
+layer behind a tunnel (VPN).
 
 ### 5.3 Single-user cloud host (optional, later)
 
@@ -241,7 +261,7 @@ is a no-op rather than a duplicate.
 | Multi-user `user_id`? | **No — single user decided 2026-11-26** | The product is single-user, so no `user_id`, no query scoping, no identity migration. The additive path remains available if that ever changes, but is not to be built speculatively (D4) |
 | Sync columns? | **Add `created_at` / `updated_at` when offline sync is built** | Required for `?since=` incremental sync (D7) |
 
-### Backup — unresolved and urgent
+### Backup — code resolved, data specified but not implemented
 
 F1 is **resolved as of 2026-11-25**: a reachable remote is configured
 (`clinemaster/PesPlan-Finance`) and the history is pushed, so the code now has an off-machine
@@ -249,9 +269,23 @@ copy. The data half is not:
 
 - **Code:** working remote + `git push`. ✅ Done.
 - **Data:** the database is correctly git-ignored (D9), which means **git will never back up
-  financial data.** A scheduled copy of `data/finance.db` (SQLite `.backup` or `VACUUM INTO`
-  for a consistent snapshot while the server runs) to storage outside the machine is **still
-  outstanding and still undesigned.** Pushing code is not a data backup.
+  financial data.** Pushing code is not a data backup.
+
+Now that the deployment is settled (2026-11-26: home server), the data backup can be specified
+rather than deferred. The shape it should take:
+
+1. **A consistent snapshot, not a file copy.** `sqlite3 data/finance.db "VACUUM INTO
+   '/backups/finance-$(date +%F).db'"` — safe while the server is running, and it compacts.
+   Copying the file directly while a write is in flight can capture a torn database.
+2. **Off the machine.** A home server is one disk in one building; a snapshot sitting beside
+   the original survives neither a drive failure nor a theft. It must leave the host.
+3. **Scheduled and verified.** A nightly `cron`/systemd timer, plus a periodic restore test —
+   an unverified backup is a belief, not a backup.
+4. **Encrypted at rest** if it leaves the home network, because the contents are a complete
+   record of someone's finances.
+
+This remains **outstanding**; it is now a specification waiting to be implemented rather than
+an open design question.
 
 ---
 
@@ -259,7 +293,7 @@ copy. The data half is not:
 
 | Concern | Today | Proposed |
 |---|---|---|
-| Transport | Plain HTTP on loopback | TLS at the proxy for anything off-machine; API binds loopback only |
+| Transport | Plain HTTP on loopback | TLS at the proxy for anything off-machine; API binds loopback only. Home server decided 2026-11-26; how the phone reaches it from outside (VPN vs port-forward) is still open — see §5.2 |
 | Authentication | **None** (F2) | Bearer token required on all `/api/v1/*`; token from env/secret file, never committed; compared with `secrets.compare_digest` |
 | Mobile token storage | — | OS keystore via `flutter_secure_storage`; never in `SharedPreferences` or source |
 | Authorization | None needed (single user, decided 2026-11-26) | Authentication alone is sufficient: one token, one person. No roles, no per-row scoping |

@@ -397,8 +397,14 @@ at step 3. **Nothing in steps 1–6 modifies `reports.py` or `categorize.py`.**
      permissions, per-user settings, invitations.
    If this is ever revisited, the path is still additive — `user_id` with a default on the
    three tables, scoped inside `db.py` — but it must not be built speculatively now.
-2. **Where will the backend run** — the desktop that has the data today, a home server, or a
-   cloud host? This decides the TLS and backup design.
+2. ~~**Where will the backend run?**~~ **DECIDED 2026-11-26: a home server.**
+   The home server owns `data/finance.db`; the API and the web dashboard run there behind a
+   reverse proxy that terminates TLS, with the application on loopback. The data backup can
+   now be specified (see `PROPOSED_SYSTEM_ARCHITECTURE.md` §7).
+   **Follow-on still open:** how the phone reaches the server from outside the house — VPN
+   (recommended), or port-forward with dynamic DNS. That decides whether a single bearer
+   token is the only thing guarding a financial API on the public internet, so it must be
+   answered before the auth work in step 3 of the build order.
 3. **Does the mobile app need offline writes**, or is read-only-when-away acceptable for v1?
    Offline writes require `created_at`/`updated_at` (D7) and a client queue; read-only is
    substantially less work.
