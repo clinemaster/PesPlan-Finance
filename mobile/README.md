@@ -1,22 +1,36 @@
-# LifePilot Finance — Design System (Phase 02)
+# LifePilot Finance — Mobile App
 
-The visual language and reusable component set for the LifePilot Finance mobile app.
-**Phase 02 delivers the design system only** — no authentication, no transactions, no
-dashboard, no backend. Every figure on screen is placeholder data.
+The Flutter client for LifePilot Finance. Built in phases:
+
+| Phase | Delivers | State |
+|---|---|---|
+| 02 | Design system — tokens, theme, components | done |
+| 03 | Welcome, mock Google sign-in, onboarding | done |
+| 04 | Dashboard | not started |
+
+**There is still no backend, no real authentication and no financial data.** Sign-in is a
+mock that contacts no Google service, and every figure in the showcase is placeholder data.
 
 ---
 
-## Running the showcase
+## Running the app
 
 ```bash
 cd mobile
 flutter pub get
-flutter run            # launches the design system showcase
+flutter run            # starts at the welcome screen
 ```
 
-The app's entry point is currently the showcase, because there are no product screens yet.
-Phase 03 replaces `main.dart` with the real root widget; the showcase then stays available
-for internal review but leaves the production navigation tree.
+`main.dart` launches the real root widget and its router. The Phase 02 design system
+showcase is still available at the `/showcase` route, reachable from the gear icon on the
+home placeholder, so the visual language stays reviewable without being what the app opens
+on.
+
+### Seeing the sign-in failure and cancellation states
+
+The mock succeeds by default. **Long-press the brand mark** on the welcome screen to choose
+what the next attempt returns — succeed, cancel or fail. The menu is a review affordance and
+goes away with the mock in Phase 12.
 
 ---
 
@@ -59,8 +73,12 @@ Widget build(BuildContext context) {
 
 ```
 lib/
-├── main.dart                        launches the showcase (Phase 02 only)
+├── main.dart                        ProviderScope + LifePilotApp
+├── app.dart                         MaterialApp.router, theme mode
 ├── core/
+│   ├── router/
+│   │   ├── routes.dart              every route path, as constants
+│   │   └── app_router.dart          go_router + the session guard
 │   ├── design_system/
 │   │   ├── design_system.dart       the single barrel import
 │   │   ├── tokens/
@@ -86,7 +104,20 @@ lib/
 │       ├── app_navigation.dart      AppTopBar, AppBottomNav
 │       ├── finance_cards.dart       balance, summary, budget, transaction row
 │       └── charts/charts.dart       line, bar, donut, category breakdown
-└── showcase/                        internal review screen
+├── features/
+│   ├── onboarding/
+│   │   ├── domain/                  AuthUser, AuthResult, AuthRepository,
+│   │   │                            Country, AppLanguage, UserProfile,
+│   │   │                            ProfileValidator — pure Dart, no widgets
+│   │   ├── data/
+│   │   │   └── mock_auth_repository.dart   the ONLY mock; replaced in Phase 12
+│   │   └── presentation/
+│   │       ├── providers/           AuthController, OnboardingController
+│   │       ├── widgets/             brand mark, Google button + painted logo,
+│   │       │                        onboarding scaffold and progress
+│   │       └── screens/             welcome, profile, preferences, completion
+│   └── home/presentation/screens/   placeholder until Phase 04
+└── showcase/                        internal review screen, route /showcase
 ```
 
 ---
@@ -152,6 +183,16 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/widgets_test.dart` | Every component's behaviour, in light and dark |
 | `test/accessibility_test.dart` | Computed WCAG contrast, touch targets, labels, 2× text |
 | `test/golden/` | Screenshots of all five showcase tabs, both themes, plus 1.6× text |
+| `test/onboarding/profile_validator_test.dart` | Name and optional-phone rules |
+| `test/onboarding/mock_auth_repository_test.dart` | The three sign-in outcomes, country/currency invariants, `UserProfile` |
+| `test/onboarding/onboarding_controller_test.dart` | Both controllers, without a widget tree |
+| `test/onboarding/welcome_screen_test.dart` | Welcome screen and its loading, cancelled and error states |
+| `test/onboarding/onboarding_flow_test.dart` | The whole flow through the real router, including back navigation |
+
+The onboarding widget tests boot the real `LifePilotApp` and override only the auth
+repository (`test/onboarding/harness.dart`). That is deliberate: the redirect guard is
+where most of this feature's behaviour lives, and a test that pumped a screen directly
+would pass even if routing were broken.
 
 Goldens are font-hinting sensitive, so they are tagged `golden` and intended for local
 review rather than as a cross-platform CI gate.
@@ -167,3 +208,10 @@ review rather than as a cross-platform CI gate.
 - **No localisation yet.** Strings are inline English. Swahili labels are typically longer
   than English, which is why status labels and card rows are built to shrink.
 - **Charts are static.** No tooltips, selection or animation — Phase 02 is visual foundations.
+- **Sign-in is a mock.** `MockAuthRepository` returns a fixed user after a delay. No Google
+  SDK, no network call, no credential, nothing persisted. Phase 12 replaces that one class.
+- **Nothing survives a restart.** Onboarding answers live in memory only; there is no
+  storage layer yet, so relaunching the app returns to the welcome screen.
+- **Language is recorded, not applied.** Choosing Kiswahili stores the preference; the
+  interface stays English until localisation lands. The screen says so rather than
+  implying otherwise.

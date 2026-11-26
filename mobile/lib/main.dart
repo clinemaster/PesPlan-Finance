@@ -1,13 +1,14 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import 'showcase/design_system_showcase.dart';
+import 'app.dart';
 
-/// Phase 02 entry point.
+/// Phase 03 entry point.
 ///
-/// The app currently launches the **design system showcase**, because Phase 02
-/// delivers the visual language and no product screens. Phase 03 replaces
-/// this with the real root widget and routing; the showcase then stays
-/// reachable for internal review but leaves the production navigation tree.
+/// The app now launches the real root widget and its router, which starts at
+/// the welcome screen. The Phase 02 design system showcase has not gone away
+/// — it is a route (`/showcase`), reachable from the home placeholder — so
+/// the visual language stays reviewable without being what the app opens on.
 void main() {
-  runApp(const DesignSystemShowcase());
+  runApp(const ProviderScope(child: LifePilotApp()));
 }
