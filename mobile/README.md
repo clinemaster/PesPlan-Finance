@@ -7,7 +7,8 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 02 | Design system — tokens, theme, components | done |
 | 03 | Welcome, mock Google sign-in, onboarding | done |
 | 04 | Navigation shell and dashboard | done |
-| 05 | Transaction history | not started |
+| 05 | Transactions — list, search, filter, add, edit, delete | done |
+| 06 | Budgets | not started |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -23,8 +24,8 @@ flutter run            # starts at the welcome screen
 ```
 
 `main.dart` launches the real root widget and its router. After onboarding the app settles
-into a five-tab shell — Home, Activity, Budgets, Goals, Assistant — of which only Home is
-built; the rest are placeholders that say which phase they arrive in.
+into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. Home and Activity are
+built; Budgets, Goals and Assistant are placeholders that say which phase they arrive in.
 
 The Phase 02 design system showcase is still available at `/showcase`, reachable from
 Profile & settings, so the visual language stays reviewable without being what the app
@@ -134,6 +135,16 @@ lib/
 │   │       │                        budget, savings, activity, quick actions,
 │   │       │                        empty state
 │   │       └── screens/dashboard_screen.dart
+│   ├── transactions/
+│   │   ├── domain/                  Transaction, categories, filter, view,
+│   │   │                            validator, date labels — pure Dart
+│   │   ├── data/
+│   │   │   └── mock_transaction_repository.dart   in-memory, plays the server
+│   │   └── presentation/
+│   │       ├── providers/           repository, filter, list, write actions
+│   │       ├── widgets/             summary strip, filter sheet, detail
+│   │       │                        sheet, category picker, type selector
+│   │       └── screens/             list, add/edit form, edit loader
 │   ├── shell/presentation/          the five-tab frame
 │   ├── settings/presentation/       profile, theme, review controls
 │   └── placeholders/presentation/   honest "not built yet" screen
@@ -213,6 +224,10 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/dashboard/greeting_test.dart` | The three time-of-day boundaries |
 | `test/dashboard/dashboard_screen_test.dart` | Every section, the empty state, and overflow at two phone sizes |
 | `test/dashboard/navigation_test.dart` | The five tabs, state preservation, settings, section links |
+| `test/transactions/mock_transaction_repository_test.dart` | Totals, grouping, search, filters, CRUD, seed integrity |
+| `test/transactions/transactions_screen_test.dart` | List, grouping, search, chips, the filter sheet, both empty states |
+| `test/transactions/transaction_crud_test.dart` | Add, edit, delete with confirmation, and every validation rule |
+| `test/transactions/architecture_test.dart` | **Rule 1, enforced:** no arithmetic on amounts outside the places allowed it |
 
 The widget tests boot the real `LifePilotApp` and override only the repositories
 (`test/*/harness.dart`). That is deliberate: the router's redirect guard is where much of
@@ -262,3 +277,11 @@ review rather than as a cross-platform CI gate.
 - **The greeting does not re-render as time passes.** It is computed per build from an
   injectable clock, so an app left open from 11:59 to 12:01 keeps saying "Good morning"
   until something else rebuilds it. A timer for this is not worth the wakeups.
+- **Transactions live in memory.** `MockTransactionRepository` holds the list for the life
+  of the process. Adding, editing and deleting work and are visible immediately; relaunching
+  the app restores the seed. Phase 13 replaces that one class.
+- **The dashboard and the transaction list do not share data.** The dashboard's figures come
+  from its own mock of the reporting API, so a transaction added in Activity does not change
+  the dashboard's totals or its recent-activity list. Deriving the dashboard from recorded
+  transactions is real financial reporting, which Phase 05 is explicitly not allowed to
+  build — so the two stay separate until a backend joins them.

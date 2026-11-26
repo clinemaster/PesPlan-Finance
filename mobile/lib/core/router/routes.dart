@@ -49,9 +49,23 @@ abstract final class Routes {
   /// Profile and settings, reached from the dashboard header.
   static const String settings = '/settings';
 
-  /// Quick actions. Placeholders until transaction entry exists.
-  static const String addExpense = '/add/expense';
-  static const String addIncome = '/add/income';
+  /// Recording a transaction. Full screen, over the shell: the form wants
+  /// the whole display and a keyboard, and a bottom bar underneath it is
+  /// just somewhere to lose a tap.
+  static const String transactionNew = '/transactions/new';
+
+  /// `?type=income` or `?type=expense` preselects the side of the ledger,
+  /// so the dashboard's two quick actions land on a form that already
+  /// knows which one the user pressed.
+  static String transactionNewOfType(String type) =>
+      '$transactionNew?type=$type';
+
+  /// Editing an existing one. `:id` is the transaction's reference.
+  static const String transactionEditPattern = '/transactions/:id/edit';
+
+  static String transactionEdit(String id) => '/transactions/$id/edit';
+
+  /// Speaking an amount instead of typing it. Still a placeholder.
   static const String addVoice = '/add/voice';
 
   /// The Phase 02 design system showcase.

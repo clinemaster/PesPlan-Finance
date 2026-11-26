@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/router/routes.dart';
+import '../../../transactions/domain/transaction.dart';
 
 /// The three things a user opens this app to do.
 ///
@@ -24,7 +25,9 @@ class QuickActions extends StatelessWidget {
             icon: AppIcons.expense,
             label: 'Add expense',
             tone: _ActionTone.expense,
-            onTap: () => context.push(Routes.addExpense),
+            onTap: () => context.push(
+              Routes.transactionNewOfType(TransactionType.expense.name),
+            ),
           ),
         ),
         const SizedBox(width: AppSpacing.cardGap),
@@ -33,7 +36,9 @@ class QuickActions extends StatelessWidget {
             icon: AppIcons.income,
             label: 'Add income',
             tone: _ActionTone.income,
-            onTap: () => context.push(Routes.addIncome),
+            onTap: () => context.push(
+              Routes.transactionNewOfType(TransactionType.income.name),
+            ),
           ),
         ),
         const SizedBox(width: AppSpacing.cardGap),

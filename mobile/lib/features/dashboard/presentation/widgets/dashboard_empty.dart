@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/router/routes.dart';
+import '../../../transactions/domain/transaction.dart';
 
 /// What a brand-new account sees.
 ///
@@ -63,13 +64,17 @@ class DashboardEmpty extends StatelessWidget {
         AppButton.primary(
           label: 'Add your first expense',
           icon: AppIcons.add,
-          onPressed: () => context.push(Routes.addExpense),
+          onPressed: () => context.push(
+            Routes.transactionNewOfType(TransactionType.expense.name),
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         AppButton.text(
           label: 'Add income instead',
           isFullWidth: true,
-          onPressed: () => context.push(Routes.addIncome),
+          onPressed: () => context.push(
+            Routes.transactionNewOfType(TransactionType.income.name),
+          ),
         ),
       ],
     );

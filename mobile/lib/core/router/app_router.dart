@@ -11,6 +11,10 @@ import '../../features/onboarding/presentation/screens/profile_setup_screen.dart
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
 import '../../features/placeholders/presentation/placeholder_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/transactions/domain/transaction.dart';
+import '../../features/transactions/presentation/screens/transaction_edit_screen.dart';
+import '../../features/transactions/presentation/screens/transaction_form_screen.dart';
+import '../../features/transactions/presentation/screens/transactions_screen.dart';
 import '../../features/shell/presentation/main_shell.dart';
 import '../../showcase/design_system_showcase.dart';
 import '../design_system/tokens/app_icons.dart';
@@ -116,13 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.transactions,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Activity',
-                  icon: AppIcons.transactions,
-                  message:
-                      'Your full transaction history, with search and '
-                      'filters, arrives in Phase 05.',
-                ),
+                builder: (context, state) => const TransactionsScreen(),
               ),
             ],
           ),
@@ -176,27 +174,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
       ),
+      // Over the shell, not inside the Activity branch: a form wants the
+      // whole screen and a keyboard, and the bottom bar under it is only
+      // somewhere to lose a tap.
       GoRoute(
-        path: Routes.addExpense,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Add expense',
-          icon: AppIcons.expense,
-          showBack: true,
-          message:
-              'Recording a purchase — amount, category, note — arrives with '
-              'transaction entry. Nothing is saved in this phase.',
+        path: Routes.transactionNew,
+        builder: (context, state) => TransactionFormScreen(
+          initialType: switch (state.uri.queryParameters['type']) {
+            'income' => TransactionType.income,
+            'expense' => TransactionType.expense,
+            _ => null,
+          },
         ),
       ),
       GoRoute(
-        path: Routes.addIncome,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Add income',
-          icon: AppIcons.income,
-          showBack: true,
-          message:
-              'Recording money in — amount, source, date — arrives with '
-              'transaction entry. Nothing is saved in this phase.',
-        ),
+        path: Routes.transactionEditPattern,
+        builder: (context, state) =>
+            TransactionEditScreen(id: state.pathParameters['id']!),
       ),
       GoRoute(
         path: Routes.addVoice,

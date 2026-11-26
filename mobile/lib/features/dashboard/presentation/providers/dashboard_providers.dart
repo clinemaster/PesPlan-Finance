@@ -5,6 +5,10 @@ import '../../domain/dashboard_data.dart';
 import '../../domain/dashboard_period.dart';
 import '../../domain/dashboard_repository.dart';
 
+/// Re-exported: the dashboard reads the clock, and callers that already
+/// import this file should not need a second import to reach it.
+export '../../../../core/time/clock.dart' show clockProvider;
+
 /// Where the dashboard's figures come from.
 ///
 /// Phase 04 binds this to the mock. Phase 05 onwards overrides it with an
@@ -66,10 +70,3 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
 
   return repository.load(period);
 });
-
-/// The current time, injectable.
-///
-/// A widget that calls `DateTime.now()` itself has a greeting that cannot be
-/// tested, and a dashboard that behaves differently depending on when the
-/// suite runs.
-final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);

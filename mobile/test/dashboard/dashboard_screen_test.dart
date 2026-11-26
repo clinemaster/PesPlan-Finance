@@ -194,8 +194,8 @@ void main() {
     });
 
     for (final (label, destination) in [
-      ('Add expense', 'Add expense'),
-      ('Add income', 'Add income'),
+      ('Add expense', 'New transaction'),
+      ('Add income', 'New transaction'),
       ('By voice', 'Record by voice'),
     ]) {
       testWidgets('$label opens its screen and comes back', (tester) async {
@@ -212,13 +212,35 @@ void main() {
       });
     }
 
-    testWidgets('the entry screens promise nothing is saved', (tester) async {
+    testWidgets('each action opens the form on the right side of the ledger', (
+      tester,
+    ) async {
+      // The quick action is the whole point: pressing "Add income" and
+      // landing on an expense form would make the shortcut worse than the
+      // long way round. The helper under the amount is the visible proof.
       await DashboardHarness.pump(tester);
+
+      await tester.tap(find.text('Add income'));
+      await tester.pumpAndSettle();
+      expect(find.text('How much came in'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Add expense'));
       await tester.pumpAndSettle();
+      expect(find.text('How much went out'), findsOneWidget);
+    });
 
-      expect(find.textContaining('Nothing is saved in this phase'), findsOneWidget);
+    testWidgets('the voice action still promises nothing is saved', (
+      tester,
+    ) async {
+      await DashboardHarness.pump(tester);
+
+      await tester.tap(find.text('By voice'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('No microphone is used'), findsOneWidget);
     });
   });
 

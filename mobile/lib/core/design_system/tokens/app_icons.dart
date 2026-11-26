@@ -105,6 +105,13 @@ abstract final class AppIcons {
   static const IconData gift = Icons.card_giftcard_rounded;
   static const IconData travel = Icons.flight_rounded;
   static const IconData business = Icons.work_rounded;
+
+  /// Paid work that is not a salary. Distinct from [business], which is a
+  /// venture rather than a commission.
+  static const IconData freelance = Icons.handyman_rounded;
+
+  /// Returns on money put away, as opposed to money earned.
+  static const IconData investment = Icons.trending_up_rounded;
   static const IconData cash = Icons.local_atm_rounded;
   static const IconData other = Icons.category_rounded;
 
@@ -139,6 +146,12 @@ abstract final class AppIcons {
     'cash': cash,
     'salary': income,
     'income': income,
+    // Entry categories, which name things in everyday words rather than by
+    // the finer distinctions the icon set happens to draw.
+    'food': dining,
+    'bills': utilities,
+    'freelance': freelance,
+    'investment': investment,
     'savings': savings,
     'transfers': transfer,
     'uncategorized': other,
