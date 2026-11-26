@@ -1,41 +1,63 @@
 import '../../../core/money/money.dart';
+import '../../reports/domain/report_period.dart';
+import '../../reports/domain/report_repository.dart';
+import '../../transactions/domain/date_labels.dart';
+import '../../transactions/domain/transaction_filter.dart';
+import '../../transactions/domain/transaction_repository.dart';
 import '../domain/dashboard_data.dart';
 import '../domain/dashboard_period.dart';
 import '../domain/dashboard_repository.dart';
 
 /// Whether the mock has anything to report.
 ///
-/// The empty dashboard is a required state and is unreachable while the mock
-/// always returns a populated account, so it is selectable. The Settings
-/// screen exposes the switch; it goes away with the mock.
+/// The empty dashboard is a required state and is unreachable while the
+/// account has records. The Settings screen exposes the switch; it goes
+/// away with the mock.
 enum MockDataMode { populated, empty }
 
-/// A stand-in for the reporting API.
+/// The dashboard, derived from the same records as everything else.
 ///
-/// ## Every figure here is a literal, including the derived ones
+/// ## Why this reads the report repository
 ///
-/// `net`, `remaining` and each `ratio` are written out rather than computed,
-/// because this class stands where the Python reporting layer will stand,
-/// and that layer is what computes them. Writing `income - expenses` here
-/// would put the arithmetic back in Dart with extra steps, and the next
-/// person would reasonably copy the pattern into a widget.
+/// It used to return authored constants. That made the dashboard the only
+/// screen in the app inventing its own figures, and once Phase 06 put a
+/// Reports entry in the dashboard header the two sat one tap apart saying
+/// different things about the same month — November read TSh 3,200,000 in
+/// on one screen and TSh 1,965,000 on the other. A user cannot tell which
+/// to believe, and neither can a reviewer.
 ///
-/// The consistency of those literals is pinned by tests, so a typo in the
-/// mock cannot quietly ship a dashboard that does not add up.
+/// So the totals and the trend come from [ReportRepository], which derives
+/// them from recorded transactions, and the recent rows come from the
+/// transaction repository directly. The dashboard is now a summary of the
+/// same truth rather than a parallel one.
 ///
-/// Figures are whole Tanzanian shillings at plausible magnitudes — seven
-/// digits, which is what makes the tabular figures and abbreviated axis
-/// ticks in the design system earn their place.
+/// ## What is still authored, and why
+///
+/// Savings goals, and the budget limit. Neither feature exists yet — there
+/// is nothing to read them from — so they stay placeholders until their
+/// own phases. The budget's *spending* is real: it is the period's
+/// expenses, so the budget card and the Money out card above it can never
+/// disagree.
 class MockDashboardRepository implements DashboardRepository {
   MockDashboardRepository({
+    required this.reports,
+    required this.transactions,
+    required this.now,
     this.mode = MockDataMode.populated,
-    this.delay = const Duration(milliseconds: 450),
+    this.delay = const Duration(milliseconds: 250),
   });
+
+  final ReportRepository reports;
+  final TransactionRepository transactions;
+  final DateTime Function() now;
 
   MockDataMode mode;
 
-  /// Long enough that the loading state is real and visible. Tests pass zero.
+  /// Long enough that the loading state is real. Tests pass zero.
   final Duration delay;
+
+  /// A placeholder monthly limit, until budgets are a feature.
+  static const int _monthlyBudgetMinorUnits = 2200000;
 
   @override
   Future<DashboardData> load(DashboardPeriod period) async {
@@ -43,242 +65,112 @@ class MockDashboardRepository implements DashboardRepository {
 
     if (mode == MockDataMode.empty) return const DashboardData.empty();
 
-    return switch (period.kind) {
-      PeriodKind.thisMonth => _thisMonth,
-      PeriodKind.thisYear => _thisYear,
-      PeriodKind.custom => _custom(period),
-    };
-  }
-
-  // ------------------------------------------------------------ this month
-
-  /// Four weeks. Income arrives once, on payday, so three weeks show no
-  /// income bar — which is the real shape of a salaried month and worth
-  /// seeing rather than smoothing away.
-  static const DashboardData _thisMonth = DashboardData(
-    income: Money(3_200_000),
-    expenses: Money(1_875_500),
-    net: Money(1_324_500),
-    trend: TrendSeries(
-      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-      income: [3_200_000, 0, 0, 0],
-      expenses: [520_000, 430_500, 495_000, 430_000],
-    ),
-    budget: BudgetOverview(
-      limit: Money(2_200_000),
-      spent: Money(1_875_500),
-      remaining: Money(324_500),
-      ratio: 0.85,
-      status: BudgetStatus.closeToLimit,
-      categoryCount: 6,
-    ),
-    savings: _savings,
-    recentTransactions: _recent,
-  );
-
-  // ------------------------------------------------------------- this year
-
-  /// Twelve months with two deliberate gaps. August and December are `null`,
-  /// not zero: a month with no records must break the line rather than drop
-  /// it to the axis, and that only gets exercised if the data contains it.
-  static const DashboardData _thisYear = DashboardData(
-    income: Money(31_950_000),
-    expenses: Money(15_850_500),
-    net: Money(16_099_500),
-    trend: TrendSeries(
-      labels: [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ],
-      income: [
-        3_100_000,
-        3_100_000,
-        3_100_000,
-        3_250_000,
-        3_200_000,
-        3_200_000,
-        3_400_000,
-        null,
-        3_200_000,
-        3_200_000,
-        3_200_000,
-        null,
-      ],
-      expenses: [
-        1_420_000,
-        1_380_000,
-        1_610_000,
-        1_250_000,
-        1_740_000,
-        1_520_000,
-        1_890_000,
-        null,
-        1_460_000,
-        1_705_000,
-        1_875_500,
-        null,
-      ],
-    ),
-    budget: BudgetOverview(
-      limit: Money(26_400_000),
-      spent: Money(15_850_500),
-      remaining: Money(10_549_500),
-      ratio: 0.60,
-      status: BudgetStatus.comfortable,
-      categoryCount: 6,
-    ),
-    savings: _savings,
-    recentTransactions: _recent,
-  );
-
-  // ---------------------------------------------------------------- custom
-
-  /// A custom range reports the same account over a shorter window.
-  ///
-  /// The bucket labels come from the chosen dates so the chart describes the
-  /// range the user actually picked, rather than showing generic buckets
-  /// that could belong to any period.
-  static DashboardData _custom(DashboardPeriod period) {
-    final labels = _bucketLabels(period);
+    final report = await reports.report(_asReportPeriod(period));
+    if (report.isEmpty) return const DashboardData.empty();
 
     return DashboardData(
-      income: const Money(1_600_000),
-      expenses: const Money(905_000),
-      net: const Money(695_000),
+      income: report.income,
+      expenses: report.expenses,
+      net: report.net,
       trend: TrendSeries(
-        labels: labels,
-        income: const [1_600_000, 0, 0, 0],
-        expenses: const [268_000, 194_000, 231_000, 212_000],
+        labels: [for (final point in report.points) point.label],
+        income: [for (final point in report.points) point.income],
+        expenses: [for (final point in report.points) point.expenses],
       ),
-      budget: const BudgetOverview(
-        limit: Money(1_100_000),
-        spent: Money(905_000),
-        remaining: Money(195_000),
-        ratio: 0.82,
-        status: BudgetStatus.closeToLimit,
-        categoryCount: 6,
-      ),
+      budget: _budgetFor(period, report.expenses),
       savings: _savings,
-      recentTransactions: _recent,
+      recentTransactions: await _recent(),
     );
   }
 
-  /// Four evenly spaced bucket labels across the range.
-  ///
-  /// Date arithmetic, not money arithmetic — Rule 1 is about amounts.
-  static List<String> _bucketLabels(DashboardPeriod period) {
-    final start = period.start;
-    final end = period.end;
-    if (start == null || end == null) {
-      return const ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    }
+  /// Dashboard windows and report windows are the same windows.
+  ReportPeriod _asReportPeriod(DashboardPeriod period) =>
+      switch (period.kind) {
+        PeriodKind.thisMonth => ReportPeriod.month(now()),
+        PeriodKind.thisYear => ReportPeriod.year(now()),
+        PeriodKind.custom => ReportPeriod.custom(
+          from: period.start ?? now(),
+          to: period.end ?? now(),
+        ),
+      };
 
-    final span = end.difference(start).inDays;
-    final step = (span / 4).ceil().clamp(1, 1000);
+  /// The five most recent transactions, whatever the selected period.
+  ///
+  /// "Recent activity" means recent, not "recent within the window" — a
+  /// user switching to the year view is not asking to see January again.
+  Future<List<TransactionSummary>> _recent() async {
+    final view = await transactions.list(TransactionFilter.none);
+    final today = now();
+
+    final rows = [
+      for (final group in view.groups) ...group.transactions,
+    ].take(5);
 
     return [
-      for (var i = 0; i < 4; i++)
-        _shortDate(start.add(Duration(days: step * i))),
+      for (final row in rows)
+        TransactionSummary(
+          id: row.id,
+          description: row.title,
+          category: row.categoryLabel,
+          amount: row.amount,
+          date: DateLabels.rowLabel(row.date, today),
+        ),
     ];
   }
 
-  static const List<String> _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
-  static String _shortDate(DateTime date) =>
-      '${date.day} ${_months[date.month - 1]}';
-
-  // --------------------------------------------------------- shared pieces
-
-  /// Savings is a running total, so it does not change with the period.
+  /// A budget, but only where a monthly limit means something.
   ///
-  /// Three goals, two previewed. The third ("Safari trip") has nothing saved
-  /// yet, which is why the totals do not match the two shown — a real
-  /// account looks like this, and a preview that always adds up to the
-  /// headline hides the fact that it is a preview.
+  /// The card is titled "Monthly budget", so showing it against a year
+  /// would be comparing a year's spending with a month's limit — which is
+  /// what the authored version used to do, scaled, and it was never
+  /// honest. For other windows the section invites the user to set one.
+  BudgetOverview? _budgetFor(DashboardPeriod period, Money expenses) {
+    if (period.kind != PeriodKind.thisMonth) return null;
+
+    const limit = _monthlyBudgetMinorUnits;
+    final spent = expenses.minorUnits;
+    final remaining = limit - spent;
+    final ratio = spent / limit;
+
+    return BudgetOverview(
+      limit: const Money(limit),
+      spent: expenses,
+      remaining: Money(remaining),
+      ratio: ratio,
+      status: switch (ratio) {
+        > 1.0 => BudgetStatus.overBudget,
+        >= 0.8 => BudgetStatus.closeToLimit,
+        _ => BudgetStatus.comfortable,
+      },
+      categoryCount: 6,
+    );
+  }
+
+  /// Still authored: there is no savings feature to read from yet.
+  ///
+  /// Three goals, two previewed. The third has nothing saved, which is why
+  /// the previews do not add up to the headline — a real account looks
+  /// like that, and a preview that always reconciles hides that it is one.
   static const SavingsOverview _savings = SavingsOverview(
     activeGoals: 3,
-    totalSaved: Money(750_000),
-    totalTarget: Money(3_200_000),
+    totalSaved: Money(750000),
+    totalTarget: Money(3200000),
     ratio: 0.23,
     previews: [
       GoalPreview(
         name: 'Emergency fund',
-        saved: Money(450_000),
-        target: Money(1_000_000),
+        saved: Money(450000),
+        target: Money(1000000),
         ratio: 0.45,
         caption: 'Started in June',
       ),
       GoalPreview(
         name: 'New laptop',
-        saved: Money(300_000),
-        target: Money(1_500_000),
+        saved: Money(300000),
+        target: Money(1500000),
         ratio: 0.20,
         caption: 'Target: March 2027',
       ),
     ],
   );
-
-  /// Five rows: a spread of categories and signs, one income so both
-  /// indicators appear, and one description long enough to prove the row
-  /// truncates rather than overflows.
-  static const List<TransactionSummary> _recent = [
-    TransactionSummary(
-      id: 'txn-001',
-      description: 'Shoprite Mlimani City',
-      category: 'groceries',
-      amount: Money(-85_400),
-      date: 'Today',
-    ),
-    TransactionSummary(
-      id: 'txn-002',
-      description: 'Salary — November',
-      category: 'business',
-      amount: Money(3_200_000),
-      date: 'Today',
-    ),
-    TransactionSummary(
-      id: 'txn-003',
-      description: 'Vodacom airtime bundle',
-      category: 'airtime',
-      amount: Money(-20_000),
-      date: 'Yesterday',
-    ),
-    TransactionSummary(
-      id: 'txn-004',
-      description: 'Bajaji to Kariakoo market and back again',
-      category: 'transport',
-      amount: Money(-6_500),
-      date: '23 Nov',
-    ),
-    TransactionSummary(
-      id: 'txn-005',
-      description: 'Luku electricity token',
-      category: 'utilities',
-      amount: Money(-45_000),
-      date: '22 Nov',
-    ),
-  ];
 }

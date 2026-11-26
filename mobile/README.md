@@ -297,12 +297,15 @@ review rather than as a cross-platform CI gate.
   the dashboard's totals or its recent-activity list. Deriving the dashboard from recorded
   transactions is real financial reporting, which Phase 05 is explicitly not allowed to
   build — so the two stay separate until a backend joins them.
-- **Reports are derived, the dashboard is not.** Reports read the transaction repository, so
-  they always agree with the transaction list. The dashboard still uses its own authored mock
-  from Phase 04, so the same month can read differently on the two screens — on the seeded
-  data, the dashboard shows TSh 3,200,000 in for November where reports show TSh 1,965,000.
-  Pointing the dashboard at the report repository is the fix, and it changes Phase 04's
-  approved behaviour and its tests, so it is being left as a decision rather than taken.
+- **Everything is derived from one source.** The dashboard reads the report repository,
+  reports read the transaction repository, and the transaction repository holds the records.
+  A figure cannot differ between two screens, and a test asserts the dashboard and the
+  reports screen agree for the same month.
+- **The budget limit and the savings goals are still authored.** Neither feature exists yet,
+  so there is nothing to read them from. The budget's *spending* is real — it is the period's
+  expenses — so the budget card and the Money out card above it cannot disagree. A monthly
+  budget is only shown for a month; against a year it would be comparing a year's spending
+  with a month's limit.
 - **Three years of history, generated.** `TransactionHistory` produces about 340 records from
   a fixed seed, so the same clock always yields the same figures: a report opened twice reads
   the same both times. The current month is hand-written; everything older is generated.

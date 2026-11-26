@@ -59,7 +59,16 @@ class ReportsHarness {
         ),
         authControllerProvider.overrideWith(_SignedInAuthController.new),
         dashboardRepositoryProvider.overrideWithValue(
-          MockDashboardRepository(delay: Duration.zero),
+          MockDashboardRepository(
+            reports: MockReportRepository(
+              transactions: transactions,
+              now: () => now,
+              delay: Duration.zero,
+            ),
+            transactions: transactions,
+            now: () => now,
+            delay: Duration.zero,
+          ),
         ),
         transactionRepositoryProvider.overrideWithValue(transactions),
         reportRepositoryProvider.overrideWithValue(

@@ -1,5 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/time/clock.dart';
+import '../../../reports/presentation/providers/report_providers.dart';
+import '../../../transactions/presentation/providers/transaction_providers.dart';
+
 import '../../data/mock_dashboard_repository.dart';
 import '../../domain/dashboard_data.dart';
 import '../../domain/dashboard_period.dart';
@@ -14,7 +18,14 @@ export '../../../../core/time/clock.dart' show clockProvider;
 /// Phase 04 binds this to the mock. Phase 05 onwards overrides it with an
 /// API-backed repository and nothing above this line changes.
 final dashboardRepositoryProvider = Provider<DashboardRepository>(
-  (ref) => MockDashboardRepository(),
+  (ref) => MockDashboardRepository(
+    // Reads the report repository rather than authoring its own figures,
+    // so the dashboard and the reports screen cannot disagree about the
+    // same month.
+    reports: ref.watch(reportRepositoryProvider),
+    transactions: ref.watch(transactionRepositoryProvider),
+    now: ref.watch(clockProvider),
+  ),
 );
 
 /// Whether the mock reports a populated account or an empty one.

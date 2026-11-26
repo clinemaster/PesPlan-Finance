@@ -8,6 +8,7 @@ import 'package:lifepilot_finance/features/dashboard/presentation/providers/dash
 import 'package:lifepilot_finance/features/onboarding/data/mock_auth_repository.dart';
 import 'package:lifepilot_finance/features/onboarding/presentation/providers/auth_providers.dart';
 import 'package:lifepilot_finance/features/onboarding/presentation/providers/onboarding_providers.dart';
+import 'package:lifepilot_finance/features/reports/data/mock_report_repository.dart';
 import 'package:lifepilot_finance/features/transactions/data/mock_transaction_repository.dart';
 import 'package:lifepilot_finance/features/transactions/domain/transaction.dart';
 import 'package:lifepilot_finance/features/transactions/presentation/providers/transaction_providers.dart';
@@ -65,7 +66,16 @@ class TransactionsHarness {
         ),
         authControllerProvider.overrideWith(_SignedInAuthController.new),
         dashboardRepositoryProvider.overrideWithValue(
-          MockDashboardRepository(delay: Duration.zero),
+          MockDashboardRepository(
+            reports: MockReportRepository(
+              transactions: repository,
+              now: () => now,
+              delay: Duration.zero,
+            ),
+            transactions: repository,
+            now: () => now,
+            delay: Duration.zero,
+          ),
         ),
         transactionRepositoryProvider.overrideWithValue(repository),
       ],

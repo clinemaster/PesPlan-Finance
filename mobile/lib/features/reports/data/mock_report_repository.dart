@@ -232,10 +232,21 @@ class MockReportRepository implements ReportRepository {
           var stop = start.add(Duration(days: span - 1));
           if (stop.isAfter(period.end)) stop = period.end;
 
+          // The month is dropped when the whole window sits inside one:
+          // six labels of "1–5 Nov" collide on a phone, and the period
+          // title directly above already says which month it is.
+          final spansMonths = period.start.month != period.end.month ||
+              period.start.year != period.end.year;
+          final suffix = spansMonths
+              ? ' ${_shortMonths[stop.month - 1]}'
+              : '';
+
           return _pointFor(
             label: span == 1
-                ? DateLabels.short(start)
-                : '${start.day}–${stop.day} ${_shortMonths[stop.month - 1]}',
+                ? (spansMonths
+                      ? DateLabels.short(start)
+                      : '${start.day}')
+                : '${start.day}–${stop.day}$suffix',
             matching: records.where((r) {
               final day = DateLabels.dayOf(r.date);
               return !day.isBefore(start) && !day.isAfter(stop);

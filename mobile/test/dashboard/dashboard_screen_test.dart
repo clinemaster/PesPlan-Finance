@@ -43,15 +43,19 @@ void main() {
 
   group('summary', () {
     testWidgets('shows money in, money out and the net', (tester) async {
-      await DashboardHarness.pump(tester);
+      final harness = await DashboardHarness.pump(tester);
 
       expect(find.text('Money in'), findsOneWidget);
       expect(find.text('Money out'), findsOneWidget);
       expect(find.text('Net this month'), findsOneWidget);
 
-      expect(find.text('TSh 3,200,000'), findsWidgets);
-      expect(find.text('TSh 1,875,500'), findsWidgets);
-      expect(find.text('TSh 1,324,500'), findsWidgets);
+      // Asserted against the data rather than against magic strings: the
+      // figures are derived from recorded transactions now, so hard-coded
+      // totals would only pin the seed in place.
+      final data = await harness.container.read(dashboardProvider.future);
+      expect(find.text(data.income.format()), findsWidgets);
+      expect(find.text(data.expenses.format()), findsWidgets);
+      expect(find.text(data.net.format()), findsWidgets);
     });
 
     testWidgets('never calls the net a balance', (tester) async {
@@ -91,7 +95,14 @@ void main() {
         PeriodKind.thisYear,
       );
       expect(find.text('Net this year'), findsOneWidget);
-      expect(find.text('TSh 31,950,000'), findsWidgets);
+
+      final year = await harness.container.read(dashboardProvider.future);
+      expect(find.text(year.income.format()), findsWidgets);
+      expect(
+        year.income.minorUnits,
+        greaterThan(0),
+        reason: 'the year must report something',
+      );
     });
 
     testWidgets('the chart switches form with the period', (tester) async {
@@ -119,25 +130,36 @@ void main() {
     });
 
     testWidgets('the figures are reachable as a table', (tester) async {
-      await DashboardHarness.pump(tester);
-
+      final harness = await DashboardHarness.pump(tester);
       await tester.tap(find.text('Table'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Week 1'), findsOneWidget);
-      expect(find.text('Week 4'), findsOneWidget);
+      // Every bucket the chart drew should have a row behind the toggle.
+      final data = await harness.container.read(dashboardProvider.future);
+      for (final label in data.trend.labels) {
+        expect(find.text(label), findsWidgets, reason: 'missing row $label');
+      }
     });
   });
 
   group('budget', () {
     testWidgets('summarises spend against the limit', (tester) async {
-      await DashboardHarness.pump(tester);
+      final harness = await DashboardHarness.pump(tester);
       await DashboardHarness.scrollTo(tester, find.text('Monthly budget'));
 
       expect(find.text('Monthly budget'), findsOneWidget);
+      // The limit is still authored — budgets are not a feature yet — but
+      // the spending against it is the period's real expenses.
       expect(find.text('of TSh 2,200,000'), findsOneWidget);
-      expect(find.text('TSh 324,500 left'), findsOneWidget);
-      expect(find.text('Close to limit'), findsOneWidget);
+
+      final data = await harness.container.read(dashboardProvider.future);
+      final budget = data.budget!;
+      expect(budget.spent.minorUnits, data.expenses.minorUnits);
+      expect(
+        find.text('${budget.remaining.format()} left'),
+        findsOneWidget,
+      );
+      expect(find.text(budget.status.label), findsOneWidget);
     });
 
     testWidgets('links to the budgets tab', (tester) async {
@@ -170,7 +192,7 @@ void main() {
 
       expect(find.byType(TransactionTile), findsNWidgets(5));
       expect(find.text('Shoprite Mlimani City'), findsOneWidget);
-      expect(find.text('Salary — November'), findsOneWidget);
+      expect(find.text('Monthly salary'), findsOneWidget);
     });
 
     testWidgets('a long description truncates rather than overflows', (
