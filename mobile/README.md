@@ -8,7 +8,8 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 03 | Welcome, mock Google sign-in, onboarding | done |
 | 04 | Navigation shell and dashboard | done |
 | 05 | Transactions — list, search, filter, add, edit, delete | done |
-| 06 | Budgets | not started |
+| 06 | Reports — periods, breakdown, annual, year comparison | done |
+| 07 | Budgets | not started |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -145,6 +146,13 @@ lib/
 │   │       ├── widgets/             summary strip, filter sheet, detail
 │   │       │                        sheet, category picker, type selector
 │   │       └── screens/             list, add/edit form, edit loader
+│   ├── reports/
+│   │   ├── domain/                  ReportPeriod and its date maths,
+│   │   │                            ReportData, comparison types
+│   │   ├── data/
+│   │   │   └── mock_report_repository.dart   derives reports from
+│   │   │                            recorded transactions
+│   │   └── presentation/            overview, annual report, comparison
 │   ├── shell/presentation/          the five-tab frame
 │   ├── settings/presentation/       profile, theme, review controls
 │   └── placeholders/presentation/   honest "not built yet" screen
@@ -228,6 +236,10 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/transactions/transactions_screen_test.dart` | List, grouping, search, chips, the filter sheet, both empty states |
 | `test/transactions/transaction_crud_test.dart` | Add, edit, delete with confirmation, and every validation rule |
 | `test/transactions/architecture_test.dart` | **Rule 1, enforced:** no arithmetic on amounts outside the places allowed it |
+| `test/reports/report_period_test.dart` | Window maths, stepping, future bounds, custom-range validation |
+| `test/reports/mock_report_repository_test.dart` | Totals, ranking, bucketing, metrics, comparison, determinism |
+| `test/reports/reports_screen_test.dart` | Period selection and stepping, empty periods, drill-down, entry points |
+| `test/reports/annual_and_comparison_test.dart` | Annual report, month drill-down, comparison and its warnings |
 
 The widget tests boot the real `LifePilotApp` and override only the repositories
 (`test/*/harness.dart`). That is deliberate: the router's redirect guard is where much of
@@ -285,3 +297,12 @@ review rather than as a cross-platform CI gate.
   the dashboard's totals or its recent-activity list. Deriving the dashboard from recorded
   transactions is real financial reporting, which Phase 05 is explicitly not allowed to
   build — so the two stay separate until a backend joins them.
+- **Reports are derived, the dashboard is not.** Reports read the transaction repository, so
+  they always agree with the transaction list. The dashboard still uses its own authored mock
+  from Phase 04, so the same month can read differently on the two screens — on the seeded
+  data, the dashboard shows TSh 3,200,000 in for November where reports show TSh 1,965,000.
+  Pointing the dashboard at the report repository is the fix, and it changes Phase 04's
+  approved behaviour and its tests, so it is being left as a decision rather than taken.
+- **Three years of history, generated.** `TransactionHistory` produces about 340 records from
+  a fixed seed, so the same clock always yields the same figures: a report opened twice reads
+  the same both times. The current month is hand-written; everything older is generated.

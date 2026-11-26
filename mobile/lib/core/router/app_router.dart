@@ -10,6 +10,9 @@ import '../../features/onboarding/presentation/screens/preferences_setup_screen.
 import '../../features/onboarding/presentation/screens/profile_setup_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
 import '../../features/placeholders/presentation/placeholder_screen.dart';
+import '../../features/reports/presentation/screens/annual_report_screen.dart';
+import '../../features/reports/presentation/screens/reports_screen.dart';
+import '../../features/reports/presentation/screens/year_comparison_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/transactions/domain/transaction.dart';
 import '../../features/transactions/presentation/screens/transaction_edit_screen.dart';
@@ -191,6 +194,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.transactionEditPattern,
         builder: (context, state) =>
             TransactionEditScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: Routes.reports,
+        builder: (context, state) => const ReportsScreen(),
+      ),
+      GoRoute(
+        path: Routes.reportsAnnual,
+        builder: (context, state) => const AnnualReportScreen(),
+      ),
+      GoRoute(
+        path: Routes.reportsCompare,
+        builder: (context, state) => const YearComparisonScreen(),
       ),
       GoRoute(
         path: Routes.addVoice,

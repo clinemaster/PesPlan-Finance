@@ -33,6 +33,10 @@ void main() {
     // The value type itself: formatting an amount means splitting it into
     // whole and fractional parts.
     'money.dart': 'formats amounts, which requires dividing them',
+    // Derives reports from recorded transactions. Stands in for the
+    // reporting API; replaced in Phase 13 along with its arithmetic.
+    'mock_report_repository.dart':
+        'plays the reporting API while the data is mocked',
     // Charts turn a value into a pixel, which the heuristic exempts.
     'charts.dart': 'lays out chart marks',
   };

@@ -62,6 +62,12 @@ class DashboardHeader extends ConsumerWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         AppIconButton(
+          icon: AppIcons.insights,
+          tooltip: 'Reports',
+          onPressed: () => context.push(Routes.reports),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        AppIconButton(
           icon: AppIcons.notifications,
           tooltip: 'Notifications',
           // Deliberately inert: Phase 04 ships the entry point, not the

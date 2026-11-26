@@ -65,6 +65,13 @@ abstract final class Routes {
 
   static String transactionEdit(String id) => '/transactions/$id/edit';
 
+  /// Reports and analytics. Reached from the dashboard and from the
+  /// transactions screen, not given a sixth tab — five is the bar's
+  /// limit, and reports are somewhere you visit rather than work.
+  static const String reports = '/reports';
+  static const String reportsAnnual = '/reports/annual';
+  static const String reportsCompare = '/reports/compare';
+
   /// Speaking an amount instead of typing it. Still a placeholder.
   static const String addVoice = '/add/voice';
 

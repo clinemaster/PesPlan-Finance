@@ -4,6 +4,7 @@ import '../domain/transaction.dart';
 import '../domain/transaction_filter.dart';
 import '../domain/transaction_repository.dart';
 import '../domain/transaction_view.dart';
+import 'transaction_history.dart';
 
 /// An in-memory stand-in for the transactions API.
 ///
@@ -198,169 +199,11 @@ class MockTransactionRepository implements TransactionRepository {
 
   // ----------------------------------------------------------- seed data
 
-  /// A fortnight of plausible Tanzanian activity.
+  /// Three years of deterministic history.
   ///
-  /// Dated relative to today so the "Today" and "Yesterday" headings are
-  /// always exercised, with a spread of categories, both signs, several
-  /// transactions on one day, and one description long enough to prove the
-  /// row truncates rather than overflowing.
-  static List<Transaction> _seedFor(DateTime now) {
-    final today = DateLabels.dayOf(now);
-    DateTime daysAgo(int days) => today.subtract(Duration(days: days));
-
-    var sequence = 0;
-    Transaction make({
-      required int days,
-      required TransactionType type,
-      required int magnitude,
-      required String categoryId,
-      required String categoryLabel,
-      required String description,
-    }) {
-      sequence++;
-      final date = daysAgo(days);
-      return Transaction.create(
-        id: 'seed-$sequence',
-        type: type,
-        magnitudeMinorUnits: magnitude,
-        categoryId: categoryId,
-        categoryLabel: categoryLabel,
-        description: description,
-        date: date,
-        // Spaced so same-day ordering is stable and deterministic.
-        createdAt: date.add(Duration(minutes: 600 - sequence)),
-      );
-    }
-
-    return [
-      make(
-        days: 0,
-        type: TransactionType.expense,
-        magnitude: 12000,
-        categoryId: 'food',
-        categoryLabel: 'Food',
-        description: 'Lunch at Chef Amin',
-      ),
-      make(
-        days: 0,
-        type: TransactionType.expense,
-        magnitude: 8000,
-        categoryId: 'transport',
-        categoryLabel: 'Transport',
-        description: 'Bajaji to the office',
-      ),
-      make(
-        days: 0,
-        type: TransactionType.expense,
-        magnitude: 85400,
-        categoryId: 'food',
-        categoryLabel: 'Food',
-        description: 'Shoprite Mlimani City',
-      ),
-      make(
-        days: 1,
-        type: TransactionType.income,
-        magnitude: 1500000,
-        categoryId: 'salary',
-        categoryLabel: 'Salary',
-        description: 'Monthly salary',
-      ),
-      make(
-        days: 1,
-        type: TransactionType.expense,
-        magnitude: 45000,
-        categoryId: 'shopping',
-        categoryLabel: 'Shopping',
-        description: 'Groceries for the week',
-      ),
-      make(
-        days: 2,
-        type: TransactionType.expense,
-        magnitude: 20000,
-        categoryId: 'bills',
-        categoryLabel: 'Bills',
-        description: 'Vodacom airtime bundle',
-      ),
-      make(
-        days: 2,
-        type: TransactionType.expense,
-        magnitude: 45000,
-        categoryId: 'bills',
-        categoryLabel: 'Bills',
-        description: 'Luku electricity token',
-      ),
-      make(
-        days: 3,
-        type: TransactionType.expense,
-        magnitude: 6500,
-        categoryId: 'transport',
-        categoryLabel: 'Transport',
-        description: 'Bajaji to Kariakoo market and back again',
-      ),
-      make(
-        days: 4,
-        type: TransactionType.income,
-        magnitude: 320000,
-        categoryId: 'freelance',
-        categoryLabel: 'Freelance',
-        description: 'Website for Mama Lishe',
-      ),
-      make(
-        days: 5,
-        type: TransactionType.expense,
-        magnitude: 150000,
-        categoryId: 'health',
-        categoryLabel: 'Health',
-        description: 'Clinic visit',
-      ),
-      make(
-        days: 6,
-        type: TransactionType.expense,
-        magnitude: 35000,
-        categoryId: 'entertainment',
-        categoryLabel: 'Entertainment',
-        description: 'Cinema with friends',
-      ),
-      make(
-        days: 8,
-        type: TransactionType.expense,
-        magnitude: 400000,
-        categoryId: 'housing',
-        categoryLabel: 'Housing',
-        description: 'Rent contribution',
-      ),
-      make(
-        days: 9,
-        type: TransactionType.income,
-        magnitude: 50000,
-        categoryId: 'gift',
-        categoryLabel: 'Gift',
-        description: 'Birthday money from auntie',
-      ),
-      make(
-        days: 11,
-        type: TransactionType.expense,
-        magnitude: 180000,
-        categoryId: 'education',
-        categoryLabel: 'Education',
-        description: 'Short course fee',
-      ),
-      make(
-        days: 12,
-        type: TransactionType.expense,
-        magnitude: 9500,
-        categoryId: 'food',
-        categoryLabel: 'Food',
-        description: 'Chipsi mayai',
-      ),
-      make(
-        days: 14,
-        type: TransactionType.income,
-        magnitude: 95000,
-        categoryId: 'business',
-        categoryLabel: 'Business',
-        description: 'Kiosk takings',
-      ),
-    ];
-  }
+  /// Lives in [TransactionHistory] rather than here because reports need
+  /// years of it, and three hundred rows inline would bury the repository
+  /// they belong to.
+  static List<Transaction> _seedFor(DateTime now) =>
+      TransactionHistory.generate(now: now);
 }

@@ -60,6 +60,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             onPressed: () => TransactionFilterSheet.show(context),
           ),
           AppIconButton(
+            icon: AppIcons.insights,
+            tooltip: 'Reports',
+            onPressed: () => context.push(Routes.reports),
+          ),
+          AppIconButton(
             icon: AppIcons.add,
             tooltip: 'Add transaction',
             onPressed: () => context.push(Routes.transactionNew),
@@ -318,23 +323,41 @@ class _Listing extends ConsumerWidget {
     }
 
     final today = ref.watch(clockProvider)();
+    final groups = view.groups;
 
-    return ListView(
+    // Lazy, not a ListView with every child built up front. The history
+    // runs to three years and a few hundred rows; laying all of them out
+    // on every build is work nobody sees.
+    //
+    // Item 0 is the summary; after that each group costs two items, a
+    // heading and the card holding that day's rows.
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.screenH,
         AppSpacing.sm,
         AppSpacing.screenH,
         AppSpacing.xxxl,
       ),
-      children: [
-        TransactionsSummaryStrip(
-          totals: view.totals,
-          isFiltered: !filter.isEmpty,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        for (final group in view.groups) ...[
-          _GroupHeader(label: group.label),
-          AppCard(
+      itemCount: 1 + groups.length * 2,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            child: TransactionsSummaryStrip(
+              totals: view.totals,
+              isFiltered: !filter.isEmpty,
+            ),
+          );
+        }
+
+        final group = groups[(index - 1) ~/ 2];
+        final isHeader = index.isOdd;
+
+        if (isHeader) return _GroupHeader(label: group.label);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+          child: AppCard(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.cardPadding,
               vertical: AppSpacing.xs,
@@ -360,9 +383,8 @@ class _Listing extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-        ],
-      ],
+        );
+      },
     );
   }
 }

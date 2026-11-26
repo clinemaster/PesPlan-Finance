@@ -82,10 +82,24 @@ void main() {
     });
 
     testWidgets('matches on category as well as description', (tester) async {
-      await TransactionsHarness.pump(tester);
+      final harness = await TransactionsHarness.pump(tester);
       await TransactionsHarness.search(tester, 'transport');
 
-      expect(find.byType(TransactionTile), findsNWidgets(2));
+      // Asserted against the result set rather than a row count: the
+      // history runs to three years, so how many transport rows exist is
+      // not a fact this test should depend on.
+      final view = await harness.container.read(
+        transactionListProvider.future,
+      );
+      final matches = view.groups.expand((g) => g.transactions);
+
+      expect(matches, isNotEmpty);
+      expect(
+        matches.every((t) => t.categoryId == 'transport'),
+        isTrue,
+        reason: 'a category search must not pull in other categories',
+      );
+      expect(find.text('Bajaji to the office'), findsOneWidget);
     });
 
     testWidgets('says so when nothing matches, without claiming the account '
