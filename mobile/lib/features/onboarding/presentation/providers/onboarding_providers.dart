@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/money/money.dart';
+import '../../../../core/storage/key_value_store.dart';
+import '../../data/session_store.dart';
 import '../../domain/app_language.dart';
 import '../../domain/country.dart';
 import '../../domain/profile_validator.dart';
@@ -55,6 +57,8 @@ class OnboardingState {
 /// place, so going back a screen cannot leave a half-applied change behind,
 /// and each transition is a value a test can assert on.
 class OnboardingController extends Notifier<OnboardingState> {
+  SessionStore get _session => SessionStore(ref.read(keyValueStoreProvider));
+
   @override
   OnboardingState build() {
     // Seeding from auth rather than having the welcome screen push the user
@@ -67,7 +71,13 @@ class OnboardingController extends Notifier<OnboardingState> {
     final auth = ref.watch(authControllerProvider);
 
     if (auth is AuthAuthenticated) {
-      return OnboardingState(draft: UserProfile.fromAuthUser(auth.user));
+      // A stored profile wins over a freshly seeded one: it holds the
+      // answers the user actually gave, where seeding from the identity
+      // would quietly undo every edit on relaunch.
+      return OnboardingState(
+        draft: _session.readProfile() ?? UserProfile.fromAuthUser(auth.user),
+        completed: _session.readCompleted(),
+      );
     }
     return const OnboardingState();
   }
@@ -106,15 +116,31 @@ class OnboardingController extends Notifier<OnboardingState> {
   void complete() {
     if (!state.canContinueFromProfile) return;
     state = state.copyWith(completed: true);
+
+    // Written together: a device that remembers the profile but not that
+    // setup finished would send the user back through it every launch.
+    final draft = state.draft;
+    if (draft != null) _session.writeProfile(draft);
+    _session.writeCompleted(true);
   }
 
   /// Drops everything. Used when a user signs out or cancels the flow.
-  void reset() => state = const OnboardingState();
+  void reset() {
+    state = const OnboardingState();
+    _session.clear();
+  }
 
   void _edit(UserProfile Function(UserProfile draft) change) {
     final current = state.draft;
     if (current == null) return;
-    state = state.copyWith(draft: change(current));
+
+    final next = change(current);
+    state = state.copyWith(draft: next);
+
+    // Edits made after setup — from Settings, later — persist as they
+    // happen. During setup nothing is stored until complete(), so an
+    // abandoned run leaves nothing behind.
+    if (state.completed) _session.writeProfile(next);
   }
 }
 

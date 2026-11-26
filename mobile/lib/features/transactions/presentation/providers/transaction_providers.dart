@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/storage/key_value_store.dart';
 import '../../../../core/time/clock.dart';
 import '../../data/mock_transaction_repository.dart';
+import '../../data/transaction_store.dart';
 import '../../domain/transaction.dart';
 import '../../domain/transaction_filter.dart';
 import '../../domain/transaction_repository.dart';
@@ -12,7 +14,10 @@ import '../../domain/transaction_view.dart';
 /// Phase 05 binds this to the in-memory mock. Phase 13 overrides it with an
 /// API-backed repository; nothing above this line changes.
 final transactionRepositoryProvider = Provider<TransactionRepository>(
-  (ref) => MockTransactionRepository(now: ref.watch(clockProvider)),
+  (ref) => MockTransactionRepository(
+    now: ref.watch(clockProvider),
+    store: TransactionStore(ref.watch(keyValueStoreProvider)),
+  ),
 );
 
 /// What the user has narrowed the list to.

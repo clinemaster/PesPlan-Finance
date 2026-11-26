@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'core/design_system/design_system.dart';
+import 'core/storage/key_value_store.dart';
 import 'core/router/app_router.dart';
 
 /// Which theme the app renders in.
@@ -11,14 +12,24 @@ import 'core/router/app_router.dart';
 /// prefers. Settings will expose an override in a later phase; the
 /// controller exists now so that screen has something to write to.
 class ThemeModeController extends Notifier<ThemeMode> {
+  static const String _key = 'settings.themeMode';
+
   @override
-  ThemeMode build() => ThemeMode.system;
+  ThemeMode build() {
+    final stored = ref.read(keyValueStoreProvider).getString(_key);
+    return ThemeMode.values
+            .where((mode) => mode.name == stored)
+            .firstOrNull ??
+        ThemeMode.system;
+  }
 
-  void set(ThemeMode mode) => state = mode;
+  void set(ThemeMode mode) {
+    state = mode;
+    ref.read(keyValueStoreProvider).setString(_key, mode.name);
+  }
 
-  void toggle() => state = state == ThemeMode.dark
-      ? ThemeMode.light
-      : ThemeMode.dark;
+  void toggle() =>
+      set(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
 }
 
 final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(

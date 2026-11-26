@@ -287,8 +287,14 @@ class _LegalLinks extends StatelessWidget {
           style: AppTypography.caption.copyWith(color: finance.textTertiary),
         ),
         const SizedBox(height: AppSpacing.xxs),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        // A Wrap, not a Row: at a large text scale, or on a narrow
+        // phone, the two links plus their separator are wider than the
+        // screen. Wrapping drops "Privacy Policy" to its own line, where
+        // a Row clips it and the user loses a link they are being asked
+        // to agree to.
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _LegalLink(
               label: 'Terms of Service',

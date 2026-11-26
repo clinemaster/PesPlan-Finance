@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/storage/key_value_store.dart';
+import '../../data/session_store.dart';
+
 import '../../data/mock_auth_repository.dart';
 import '../../domain/auth_repository.dart';
 import '../../domain/auth_result.dart';
@@ -112,8 +115,18 @@ final class AuthAuthenticated extends AuthState {
 /// whole sign-in lifecycle — including the loading, cancelled and error
 /// branches — is testable without pumping a frame.
 class AuthController extends Notifier<AuthState> {
+  SessionStore get _session => SessionStore(ref.read(keyValueStoreProvider));
+
+  /// Restores a stored session synchronously.
+  ///
+  /// Doing it here rather than in an async bootstrap is what stops the
+  /// app flashing the welcome screen for a frame before discovering it
+  /// already has a user.
   @override
-  AuthState build() => const AuthIdle();
+  AuthState build() {
+    final user = _session.readUser();
+    return user == null ? const AuthIdle() : AuthAuthenticated(user);
+  }
 
   Future<void> signInWithGoogle() async {
     // A second tap while the first attempt is in flight would start a
@@ -134,6 +147,10 @@ class AuthController extends Notifier<AuthState> {
 
     final result = await repository.signInWithGoogle();
 
+    if (result case AuthSuccess(:final user)) {
+      await _session.writeUser(user);
+    }
+
     state = switch (result) {
       AuthSuccess(:final user) => AuthAuthenticated(user),
       AuthCancelled() => const AuthDismissed(),
@@ -151,6 +168,9 @@ class AuthController extends Notifier<AuthState> {
 
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();
+    // Clears the profile and the completed flag too: a signed-out device
+    // should not keep someone's name and answers lying about.
+    await _session.clear();
     state = const AuthIdle();
   }
 }

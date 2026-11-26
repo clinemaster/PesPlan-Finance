@@ -5,6 +5,7 @@ import '../domain/transaction_filter.dart';
 import '../domain/transaction_repository.dart';
 import '../domain/transaction_view.dart';
 import 'transaction_history.dart';
+import 'transaction_store.dart';
 
 /// An in-memory stand-in for the transactions API.
 ///
@@ -30,12 +31,37 @@ class MockTransactionRepository implements TransactionRepository {
   MockTransactionRepository({
     required this.now,
     List<Transaction>? seed,
+    this.store,
     this.delay = const Duration(milliseconds: 250),
-  }) : _transactions = [...seed ?? _seedFor(now())];
+  }) : _transactions = _initial(now: now, seed: seed, store: store);
+
+  /// What the repository starts with.
+  ///
+  /// An explicit seed wins — that is a test saying exactly what it wants.
+  /// Otherwise anything previously stored, so a relaunch finds the user's
+  /// own records. Only a first launch generates the history, and it is
+  /// written straight away so the next launch reads it back rather than
+  /// generating something new.
+  static List<Transaction> _initial({
+    required DateTime Function() now,
+    required List<Transaction>? seed,
+    required TransactionStore? store,
+  }) {
+    if (seed != null) return [...seed];
+    if (store != null && store.hasStoredData) return store.read();
+
+    final generated = _seedFor(now());
+    store?.write(generated);
+    return generated;
+  }
 
   /// The clock, injected so the seed's relative dates ("Today",
   /// "Yesterday") and the validator agree, and so tests can pin both.
   final DateTime Function() now;
+
+  /// Where records survive a relaunch. Null means in-memory only, which
+  /// is what a test wants unless it is testing persistence.
+  final TransactionStore? store;
 
   /// Long enough that the loading state is real. Tests pass zero.
   final Duration delay;
@@ -84,6 +110,7 @@ class MockTransactionRepository implements TransactionRepository {
   Future<Transaction> add(Transaction transaction) async {
     await Future<void>.delayed(delay);
     _transactions.add(transaction);
+    await store?.write(_transactions);
     return transaction;
   }
 
@@ -96,6 +123,7 @@ class MockTransactionRepository implements TransactionRepository {
       throw StateError('No transaction with id ${transaction.id}');
     }
     _transactions[index] = transaction;
+    await store?.write(_transactions);
     return transaction;
   }
 
@@ -103,6 +131,7 @@ class MockTransactionRepository implements TransactionRepository {
   Future<void> delete(String id) async {
     await Future<void>.delayed(delay);
     _transactions.removeWhere((t) => t.id == id);
+    await store?.write(_transactions);
   }
 
   /// An id for a newly created transaction.

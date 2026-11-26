@@ -88,6 +88,8 @@ lib/
 │   ├── router/
 │   │   ├── routes.dart              every route path, as constants
 │   │   └── app_router.dart          go_router + the session guard
+│   ├── storage/
+│   │   └── key_value_store.dart     persisted state; in-memory by default
 │   ├── design_system/
 │   │   ├── design_system.dart       the single barrel import
 │   │   ├── tokens/
@@ -240,6 +242,8 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/reports/mock_report_repository_test.dart` | Totals, ranking, bucketing, metrics, comparison, determinism |
 | `test/reports/reports_screen_test.dart` | Period selection and stepping, empty periods, drill-down, entry points |
 | `test/reports/annual_and_comparison_test.dart` | Annual report, month drill-down, comparison and its warnings |
+| `test/persistence/persistence_test.dart` | Session, profile, transactions and preferences across a relaunch; unreadable stored state |
+| `test/persistence/relaunch_test.dart` | The whole app restarted over the same storage |
 
 The widget tests boot the real `LifePilotApp` and override only the repositories
 (`test/*/harness.dart`). That is deliberate: the router's redirect guard is where much of
@@ -271,8 +275,6 @@ review rather than as a cross-platform CI gate.
 - **Charts are static.** No tooltips, selection or animation — Phase 02 is visual foundations.
 - **Sign-in is a mock.** `MockAuthRepository` returns a fixed user after a delay. No Google
   SDK, no network call, no credential, nothing persisted. Phase 12 replaces that one class.
-- **Nothing survives a restart.** Onboarding answers live in memory only; there is no
-  storage layer yet, so relaunching the app returns to the welcome screen.
 - **Language is recorded, not applied.** Choosing Kiswahili stores the preference; the
   interface stays English until localisation lands. The screen says so rather than
   implying otherwise.
@@ -289,9 +291,6 @@ review rather than as a cross-platform CI gate.
 - **The greeting does not re-render as time passes.** It is computed per build from an
   injectable clock, so an app left open from 11:59 to 12:01 keeps saying "Good morning"
   until something else rebuilds it. A timer for this is not worth the wakeups.
-- **Transactions live in memory.** `MockTransactionRepository` holds the list for the life
-  of the process. Adding, editing and deleting work and are visible immediately; relaunching
-  the app restores the seed. Phase 13 replaces that one class.
 - **The dashboard and the transaction list do not share data.** The dashboard's figures come
   from its own mock of the reporting API, so a transaction added in Activity does not change
   the dashboard's totals or its recent-activity list. Deriving the dashboard from recorded
@@ -309,3 +308,37 @@ review rather than as a cross-platform CI gate.
 - **Three years of history, generated.** `TransactionHistory` produces about 340 records from
   a fixed seed, so the same clock always yields the same figures: a report opened twice reads
   the same both times. The current month is hand-written; everything older is generated.
+
+---
+
+## Persistence
+
+State survives a relaunch, in `shared_preferences` behind `KeyValueStore`:
+
+| What | Where | Notes |
+|---|---|---|
+| Session and profile | `session.*` | Written when setup completes, and on later edits |
+| Transactions | `transactions.all` | The whole list as JSON, rewritten on every change |
+| Theme | `settings.themeMode` | |
+
+Three things are worth knowing.
+
+**Controllers restore themselves synchronously inside `build()`.** `main()` opens storage
+before the first frame and hands it to the provider scope ready to read, so a returning user
+goes straight to their dashboard. An async bootstrap would paint the welcome screen for a
+frame first, and that flash is more expensive than the few milliseconds of reading one file.
+
+**Unreadable stored state is treated as absent, never fatal.** A damaged session reads as no
+session and a damaged transaction list reads as empty. Signing in again is recoverable; a
+crash loop on launch is not.
+
+**No credential is stored here.** `shared_preferences` is an unencrypted file. What is kept
+is a name, an email and the answers from setup — all of it already on screen whenever the app
+is open. The real token Phase 12 introduces belongs in `flutter_secure_storage`, which is why
+`KeyValueStore` has no "secure" flag to make the wrong choice look available.
+
+A JSON blob rather than `drift`: there is no server yet, so there is nothing to cache and
+nothing to query server-side. A few hundred records is about a hundred kilobytes, and
+rewriting it on every change is wasteful in principle and imperceptible in practice at this
+size. When the list outgrows one write, the move happens inside `TransactionStore` without
+touching a screen.

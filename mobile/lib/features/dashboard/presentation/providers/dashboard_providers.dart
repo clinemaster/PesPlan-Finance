@@ -74,6 +74,12 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   final period = ref.watch(selectedPeriodProvider);
   final mode = ref.watch(mockDataModeProvider);
 
+  // Depends on the transaction list so recording something from the
+  // dashboard's own quick action refreshes the figures behind it. Without
+  // this the user adds an expense, lands back on the dashboard, and finds
+  // the totals unchanged.
+  ref.watch(transactionListProvider);
+
   final repository = ref.read(dashboardRepositoryProvider);
 
   // Only the mock has a mode. The real repository reports what is there.
