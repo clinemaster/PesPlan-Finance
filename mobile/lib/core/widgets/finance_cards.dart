@@ -420,7 +420,8 @@ class TransactionTile extends StatelessWidget {
             horizontal: AppSpacing.lg,
             vertical: AppSpacing.md,
           ),
-          child: Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
             children: [
               CategoryIcon(category: category),
               const SizedBox(width: AppSpacing.md),
@@ -450,19 +451,41 @@ class TransactionTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Sign is shown as well as colour, so direction survives for a
-              // colour-blind reader and in a grayscale screenshot.
-              MoneyText(
-                amount,
-                size: MoneySize.medium,
-                showSign: true,
-                alignment: Alignment.centerRight,
+              // Capped rather than flexed, so the amount can shrink without
+              // taxing the description.
+              //
+              // MoneyText promises a figure scales down rather than
+              // truncating, but its FittedBox only scales under bounded
+              // constraints, and a plain Row child is unbounded along the
+              // main axis — so the promise silently failed and a long
+              // amount overflowed the row instead.
+              //
+              // Flexible would bound it, but Expanded above is *tight*:
+              // whatever flex the amount is given is taken from the
+              // description permanently, even when the amount does not
+              // need it, and descriptions start truncating at half width
+              // for no reason. A hard cap bounds the amount only at the
+              // extreme, and leaves every ordinary row exactly as it was.
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth / 2,
+                ),
+                child: MoneyText(
+                  amount,
+                  size: MoneySize.medium,
+                  // Sign is shown as well as colour, so direction survives
+                  // for a colour-blind reader and in a grayscale
+                  // screenshot.
+                  showSign: true,
+                  alignment: Alignment.centerRight,
+                ),
               ),
               if (trailing != null) ...[
                 const SizedBox(width: AppSpacing.sm),
                 trailing!,
               ],
             ],
+            ),
           ),
         ),
       ),

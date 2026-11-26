@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lifepilot_finance/core/money/money.dart';
+import 'package:lifepilot_finance/core/design_system/design_system.dart';
 import 'package:lifepilot_finance/features/onboarding/data/mock_auth_repository.dart';
 import 'package:lifepilot_finance/features/onboarding/domain/country.dart';
 import 'package:material_ui/material_ui.dart';
@@ -211,7 +211,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(harness.onboarding.completed, isTrue);
-      expect(find.textContaining('Welcome, Amina'), findsOneWidget);
+      // The dashboard greets by first name. The greeting word depends on
+      // the hour and the wave is joined by a non-breaking space, so match
+      // only the part that is stable.
+      expect(find.textContaining('Amina'), findsOneWidget);
       expect(find.text('You are all set, Amina'), findsNothing);
     });
 
@@ -319,7 +322,23 @@ void main() {
       await tester.tap(find.text('Start using LifePilot'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Sign out'));
+      // Sign out lives in Settings, reached from the dashboard avatar.
+      await tester.tap(find.bySemanticsLabel('Profile and settings'));
+      await tester.pumpAndSettle();
+
+      final signOut = find.widgetWithText(AppButton, 'Sign out');
+      await tester.scrollUntilVisible(
+        signOut,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(signOut);
+      await tester.pumpAndSettle();
+
+      // Confirm in the dialog, which is the later of the two buttons now
+      // carrying that label.
+      await tester.tap(signOut.last);
       await tester.pumpAndSettle();
 
       expect(find.text('Continue with Google'), findsOneWidget);

@@ -28,6 +28,20 @@ abstract final class AppIcons {
   static const IconData settings = Icons.settings_rounded;
   static const IconData profile = Icons.person_rounded;
 
+  /// The conversational helper. A sparkle rather than a robot or a speech
+  /// bubble: the first says "something clever happens here", the other two
+  /// promise either a machine or a chat transcript, and the feature is
+  /// neither.
+  static const IconData assistant = Icons.auto_awesome_rounded;
+
+  /// Outlined, unlike its neighbours, because a filled bell reads as "you
+  /// have unread items" even when the badge is absent.
+  static const IconData notifications = Icons.notifications_none_rounded;
+
+  /// Speaking an amount instead of typing it. Shares the money group's
+  /// logic: the icon names the input method, not the device.
+  static const IconData voice = Icons.mic_rounded;
+
   // ---------------------------------------------------------------- money
   // Direction is the meaning: money arriving points in, money leaving
   // points out. Arrows are used rather than +/- because they survive

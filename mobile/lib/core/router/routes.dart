@@ -20,8 +20,39 @@ abstract final class Routes {
   /// Prefix guard for the whole onboarding section.
   static const String onboardingPrefix = '/onboarding';
 
-  /// The main application. A placeholder until Phase 04.
+  // --------------------------------------------------- the app's five tabs
+  //
+  // Each is a branch of the navigation shell, so switching tabs preserves
+  // where the user was in the one they left.
+
+  /// Tab 1 — the dashboard.
   static const String home = '/home';
+
+  /// Tab 2 — full transaction history. Placeholder until Phase 05.
+  static const String transactions = '/transactions';
+
+  /// Tab 3 — budgets. Placeholder until its phase.
+  static const String budgets = '/budgets';
+
+  /// Tab 4 — savings goals. Placeholder until its phase.
+  static const String goals = '/goals';
+
+  /// Tab 5 — the assistant. Placeholder until its phase.
+  static const String assistant = '/assistant';
+
+  // ------------------------------------------------- pushed over the shell
+  //
+  // These cover the bottom bar rather than living beside it: they are
+  // errands, not destinations, and a user finishing one expects to land back
+  // where they started.
+
+  /// Profile and settings, reached from the dashboard header.
+  static const String settings = '/settings';
+
+  /// Quick actions. Placeholders until transaction entry exists.
+  static const String addExpense = '/add/expense';
+  static const String addIncome = '/add/income';
+  static const String addVoice = '/add/voice';
 
   /// The Phase 02 design system showcase.
   ///

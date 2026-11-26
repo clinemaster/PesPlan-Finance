@@ -6,7 +6,8 @@ The Flutter client for LifePilot Finance. Built in phases:
 |---|---|---|
 | 02 | Design system — tokens, theme, components | done |
 | 03 | Welcome, mock Google sign-in, onboarding | done |
-| 04 | Dashboard | not started |
+| 04 | Navigation shell and dashboard | done |
+| 05 | Transaction history | not started |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -21,16 +22,22 @@ flutter pub get
 flutter run            # starts at the welcome screen
 ```
 
-`main.dart` launches the real root widget and its router. The Phase 02 design system
-showcase is still available at the `/showcase` route, reachable from the gear icon on the
-home placeholder, so the visual language stays reviewable without being what the app opens
-on.
+`main.dart` launches the real root widget and its router. After onboarding the app settles
+into a five-tab shell — Home, Activity, Budgets, Goals, Assistant — of which only Home is
+built; the rest are placeholders that say which phase they arrive in.
 
-### Seeing the sign-in failure and cancellation states
+The Phase 02 design system showcase is still available at `/showcase`, reachable from
+Profile & settings, so the visual language stays reviewable without being what the app
+opens on.
 
-The mock succeeds by default. **Long-press the brand mark** on the welcome screen to choose
-what the next attempt returns — succeed, cancel or fail. The menu is a review affordance and
-goes away with the mock in Phase 12.
+### Seeing the states that are hard to reach
+
+Both controls are review affordances and go away with the mock data.
+
+- **Sign-in cancelled / failed** — long-press the brand mark on the welcome screen and pick
+  what the next attempt returns.
+- **The empty dashboard** — Profile & settings → Review controls → *Show the empty
+  dashboard*.
 
 ---
 
@@ -116,7 +123,20 @@ lib/
 │   │       ├── widgets/             brand mark, Google button + painted logo,
 │   │       │                        onboarding scaffold and progress
 │   │       └── screens/             welcome, profile, preferences, completion
-│   └── home/presentation/screens/   placeholder until Phase 04
+│   ├── dashboard/
+│   │   ├── domain/                  DashboardData and its parts, DashboardPeriod,
+│   │   │                            greetingFor — every figure already computed
+│   │   ├── data/
+│   │   │   └── mock_dashboard_repository.dart   stands in for the reporting API
+│   │   └── presentation/
+│   │       ├── providers/           period, data, mock mode, injectable clock
+│   │       ├── widgets/             header, period selector, summary, chart,
+│   │       │                        budget, savings, activity, quick actions,
+│   │       │                        empty state
+│   │       └── screens/dashboard_screen.dart
+│   ├── shell/presentation/          the five-tab frame
+│   ├── settings/presentation/       profile, theme, review controls
+│   └── placeholders/presentation/   honest "not built yet" screen
 └── showcase/                        internal review screen, route /showcase
 ```
 
@@ -189,10 +209,24 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/onboarding/welcome_screen_test.dart` | Welcome screen and its loading, cancelled and error states |
 | `test/onboarding/onboarding_flow_test.dart` | The whole flow through the real router, including back navigation |
 
-The onboarding widget tests boot the real `LifePilotApp` and override only the auth
-repository (`test/onboarding/harness.dart`). That is deliberate: the redirect guard is
-where most of this feature's behaviour lives, and a test that pumped a screen directly
-would pass even if routing were broken.
+| `test/dashboard/mock_dashboard_repository_test.dart` | That the mock's figures add up — net, remaining, every ratio |
+| `test/dashboard/greeting_test.dart` | The three time-of-day boundaries |
+| `test/dashboard/dashboard_screen_test.dart` | Every section, the empty state, and overflow at two phone sizes |
+| `test/dashboard/navigation_test.dart` | The five tabs, state preservation, settings, section links |
+
+The widget tests boot the real `LifePilotApp` and override only the repositories
+(`test/*/harness.dart`). That is deliberate: the router's redirect guard is where much of
+this behaviour lives, and a test that pumped a screen directly would pass even if routing
+were broken.
+
+The dashboard tests run at phone sizes (393x851 and 320x568) rather than the 800x600
+default, because the default surface is wider and shorter than any Android device and hides
+exactly the overflow worth checking for. Two real overflows and one infinite-constraint
+crash were caught that way while building Phase 04.
+
+`mock_dashboard_repository_test.dart` does the arithmetic the app itself is forbidden from
+doing — net, remaining, ratios — so the mock's consistency is pinned once rather than
+recomputed on every frame by a widget.
 
 Goldens are font-hinting sensitive, so they are tagged `golden` and intended for local
 review rather than as a cross-platform CI gate.
@@ -215,3 +249,16 @@ review rather than as a cross-platform CI gate.
 - **Language is recorded, not applied.** Choosing Kiswahili stores the preference; the
   interface stays English until localisation lands. The screen says so rather than
   implying otherwise.
+- **Every dashboard figure is mock.** `MockDashboardRepository` stands where the Python
+  reporting API will stand. Its derived values — net, remaining, each ratio — are written
+  out as literals rather than computed, because that layer is what computes them, and
+  putting the arithmetic in Dart would be the start of the duplicate finance engine the
+  architecture exists to prevent.
+- **Four of the five tabs are placeholders.** Activity, Budgets, Goals and Assistant say
+  which phase they arrive in and show no figures, so a placeholder is never mistaken for a
+  finished screen in a screenshot.
+- **Quick actions save nothing.** Add expense, add income and record-by-voice open screens
+  that say so. No microphone is touched.
+- **The greeting does not re-render as time passes.** It is computed per build from an
+  injectable clock, so an app left open from 11:59 to 12:01 keeps saying "Good morning"
+  until something else rebuilds it. A timer for this is not worth the wakeups.

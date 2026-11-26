@@ -1,0 +1,75 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/mock_dashboard_repository.dart';
+import '../../domain/dashboard_data.dart';
+import '../../domain/dashboard_period.dart';
+import '../../domain/dashboard_repository.dart';
+
+/// Where the dashboard's figures come from.
+///
+/// Phase 04 binds this to the mock. Phase 05 onwards overrides it with an
+/// API-backed repository and nothing above this line changes.
+final dashboardRepositoryProvider = Provider<DashboardRepository>(
+  (ref) => MockDashboardRepository(),
+);
+
+/// Whether the mock reports a populated account or an empty one.
+///
+/// Exists so the empty dashboard — a required state — is reachable without
+/// editing code. Settings exposes the switch. Goes away with the mock.
+class MockDataModeController extends Notifier<MockDataMode> {
+  @override
+  MockDataMode build() => MockDataMode.populated;
+
+  void select(MockDataMode mode) => state = mode;
+
+  void toggle() => state = state == MockDataMode.populated
+      ? MockDataMode.empty
+      : MockDataMode.populated;
+}
+
+final mockDataModeProvider =
+    NotifierProvider<MockDataModeController, MockDataMode>(
+      MockDataModeController.new,
+    );
+
+/// The window the dashboard is summarising.
+class SelectedPeriodController extends Notifier<DashboardPeriod> {
+  @override
+  DashboardPeriod build() => const DashboardPeriod.thisMonth();
+
+  void select(DashboardPeriod period) => state = period;
+}
+
+final selectedPeriodProvider =
+    NotifierProvider<SelectedPeriodController, DashboardPeriod>(
+      SelectedPeriodController.new,
+    );
+
+/// The dashboard's data for the selected period.
+///
+/// One provider for the whole screen rather than one per card: the real
+/// endpoint is a single request, and six independent futures would give the
+/// dashboard six ways to half-load and six spinners to reconcile.
+///
+/// `AsyncValue` carries loading and error without either being invented
+/// here, which is what lets the screen render all three states from one
+/// switch.
+final dashboardProvider = FutureProvider<DashboardData>((ref) async {
+  final period = ref.watch(selectedPeriodProvider);
+  final mode = ref.watch(mockDataModeProvider);
+
+  final repository = ref.read(dashboardRepositoryProvider);
+
+  // Only the mock has a mode. The real repository reports what is there.
+  if (repository is MockDashboardRepository) repository.mode = mode;
+
+  return repository.load(period);
+});
+
+/// The current time, injectable.
+///
+/// A widget that calls `DateTime.now()` itself has a greeting that cannot be
+/// tested, and a dashboard that behaves differently depending on when the
+/// suite runs.
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);

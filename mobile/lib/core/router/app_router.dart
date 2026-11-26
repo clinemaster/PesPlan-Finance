@@ -2,14 +2,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../features/home/presentation/screens/home_placeholder_screen.dart';
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/onboarding/presentation/providers/auth_providers.dart';
 import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../../features/onboarding/presentation/screens/completion_screen.dart';
 import '../../features/onboarding/presentation/screens/preferences_setup_screen.dart';
 import '../../features/onboarding/presentation/screens/profile_setup_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
+import '../../features/placeholders/presentation/placeholder_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/shell/presentation/main_shell.dart';
 import '../../showcase/design_system_showcase.dart';
+import '../design_system/tokens/app_icons.dart';
 import 'routes.dart';
 
 /// The app's router, with the session guard that decides which section a
@@ -17,21 +21,24 @@ import 'routes.dart';
 ///
 /// ## Why the guard lives here and not in the screens
 ///
-/// Three screens each calling `context.go` after checking their own
-/// conditions is three places to get the rule wrong, and the bug it produces
-/// — a user landing in onboarding with no draft, or back on welcome while
-/// signed in — only shows up on a specific path through the app. One
-/// `redirect` means the rule is stated once and applies to every entry,
-/// including deep links and the back button.
+/// Several screens each calling `context.go` after checking their own
+/// conditions is several places to get the rule wrong, and the bug it
+/// produces — a user landing in onboarding with no draft, or back on
+/// welcome while signed in — only shows up on a specific path through the
+/// app. One `redirect` means the rule is stated once and applies to every
+/// entry, including deep links and the back button.
 ///
-/// Because of this, screens do not navigate forward after completing a step
-/// where the guard already implies the destination. Signing in makes the
-/// router move to onboarding; completing onboarding makes it move to home.
-/// The screens change state, the router responds.
+/// ## Why the five tabs are a StatefulShellRoute
+///
+/// Each branch keeps its own navigation stack, so opening something in
+/// Activity, switching to Budgets and coming back leaves Activity where it
+/// was. A single shared Navigator cannot do that, and the alternative —
+/// rebuilding each tab from its root on every switch — loses scroll
+/// position and any half-finished work on the screen.
 final routerProvider = Provider<GoRouter>((ref) {
   // go_router needs a Listenable to know when to re-run the guard. Bridging
-  // Riverpod to it with a counter is the smallest thing that works: the value
-  // is never read, only its change.
+  // Riverpod to it with a counter is the smallest thing that works: the
+  // value is never read, only its change.
   final refresh = ValueNotifier<int>(0);
   ref
     ..listen(authControllerProvider, (_, _) => refresh.value++)
@@ -46,7 +53,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // them. This guard runs synchronously from the listeners above, at a
       // point where a derived provider has been marked dirty but not yet
       // recomputed — so `currentUserProvider` would still report the
-      // previous user and send a signed-out person back into onboarding.
+      // previous user and send a signed-out person back into the app.
       // The controllers are the values that just changed, so they are
       // current by definition.
       final signedIn = ref.read(authControllerProvider) is AuthAuthenticated;
@@ -66,7 +73,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             : Routes.onboardingProfile;
       }
 
-      // Onboarding is done: welcome and the onboarding steps are behind them.
+      // Onboarding is done: welcome and the onboarding steps are behind
+      // them. Everything else — the five tabs, settings, quick actions —
+      // is theirs to navigate.
       return location.startsWith(Routes.onboardingPrefix) ||
               location == Routes.welcome
           ? Routes.home
@@ -89,10 +98,118 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.onboardingComplete,
         builder: (context, state) => const CompletionScreen(),
       ),
-      GoRoute(
-        path: Routes.home,
-        builder: (context, state) => const HomePlaceholderScreen(),
+
+      // ------------------------------------------------- the app, in tabs
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.home,
+                builder: (context, state) => const DashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.transactions,
+                builder: (context, state) => const PlaceholderScreen(
+                  title: 'Activity',
+                  icon: AppIcons.transactions,
+                  message:
+                      'Your full transaction history, with search and '
+                      'filters, arrives in Phase 05.',
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.budgets,
+                builder: (context, state) => const PlaceholderScreen(
+                  title: 'Budgets',
+                  icon: AppIcons.budgets,
+                  message:
+                      'Set a limit per category and track it through the '
+                      'month. Coming in a later phase.',
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.goals,
+                builder: (context, state) => const PlaceholderScreen(
+                  title: 'Goals',
+                  icon: AppIcons.goals,
+                  message:
+                      'Name what you are saving for, set a target, and '
+                      'watch it fill up. Coming in a later phase.',
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.assistant,
+                builder: (context, state) => const PlaceholderScreen(
+                  title: 'Assistant',
+                  icon: AppIcons.assistant,
+                  message:
+                      'Ask about your spending in plain language. Coming in '
+                      'a later phase.',
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+
+      // -------------------------------------------- pushed over the shell
+      GoRoute(
+        path: Routes.settings,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.addExpense,
+        builder: (context, state) => const PlaceholderScreen(
+          title: 'Add expense',
+          icon: AppIcons.expense,
+          showBack: true,
+          message:
+              'Recording a purchase — amount, category, note — arrives with '
+              'transaction entry. Nothing is saved in this phase.',
+        ),
+      ),
+      GoRoute(
+        path: Routes.addIncome,
+        builder: (context, state) => const PlaceholderScreen(
+          title: 'Add income',
+          icon: AppIcons.income,
+          showBack: true,
+          message:
+              'Recording money in — amount, source, date — arrives with '
+              'transaction entry. Nothing is saved in this phase.',
+        ),
+      ),
+      GoRoute(
+        path: Routes.addVoice,
+        builder: (context, state) => const PlaceholderScreen(
+          title: 'Record by voice',
+          icon: AppIcons.voice,
+          showBack: true,
+          message:
+              'Say "two thousand for a bajaji" and have it filed correctly. '
+              'No microphone is used in this phase.',
+        ),
+      ),
+
       GoRoute(
         path: Routes.showcase,
         builder: (context, state) => const ShowcaseHome(),
