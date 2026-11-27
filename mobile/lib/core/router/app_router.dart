@@ -2,6 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../features/budgets/domain/budget.dart';
+import '../../features/budgets/presentation/screens/budget_edit_screen.dart';
+import '../../features/budgets/presentation/screens/budget_form_screen.dart';
+import '../../features/budgets/presentation/screens/budgets_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/onboarding/presentation/providers/auth_providers.dart';
 import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
@@ -131,13 +135,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.budgets,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Budgets',
-                  icon: AppIcons.budgets,
-                  message:
-                      'Set a limit per category and track it through the '
-                      'month. Coming in a later phase.',
-                ),
+                builder: (context, state) => const BudgetsScreen(),
               ),
             ],
           ),
@@ -194,6 +192,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.transactionEditPattern,
         builder: (context, state) =>
             TransactionEditScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: Routes.budgetNew,
+        builder: (context, state) => BudgetFormScreen(
+          initialKind: switch (state.uri.queryParameters['kind']) {
+            'overall' => BudgetKind.overall,
+            'category' => BudgetKind.category,
+            _ => null,
+          },
+        ),
+      ),
+      GoRoute(
+        path: Routes.budgetEditPattern,
+        builder: (context, state) =>
+            BudgetEditScreen(id: state.pathParameters['id']!),
       ),
       GoRoute(
         path: Routes.reports,

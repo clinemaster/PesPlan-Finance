@@ -1,4 +1,6 @@
 import '../../../core/money/money.dart';
+import '../../budgets/domain/budget_repository.dart';
+import '../../budgets/domain/budget_status.dart' as plans;
 import '../../reports/domain/report_period.dart';
 import '../../reports/domain/report_repository.dart';
 import '../../transactions/domain/date_labels.dart';
@@ -33,15 +35,17 @@ enum MockDataMode { populated, empty }
 ///
 /// ## What is still authored, and why
 ///
-/// Savings goals, and the budget limit. Neither feature exists yet — there
-/// is nothing to read them from — so they stay placeholders until their
-/// own phases. The budget's *spending* is real: it is the period's
-/// expenses, so the budget card and the Money out card above it can never
-/// disagree.
+/// Only the savings goals. There is no savings feature to read them from
+/// yet, so they stay a placeholder until that phase. The budget card
+/// reads the budgets feature, so the limit it quotes is the one the user
+/// actually set and the spending against it is the period's own
+/// expenses — the card, the Money out figure above it and the Budgets
+/// screen cannot disagree.
 class MockDashboardRepository implements DashboardRepository {
   MockDashboardRepository({
     required this.reports,
     required this.transactions,
+    required this.budgets,
     required this.now,
     this.mode = MockDataMode.populated,
     this.delay = const Duration(milliseconds: 250),
@@ -49,15 +53,17 @@ class MockDashboardRepository implements DashboardRepository {
 
   final ReportRepository reports;
   final TransactionRepository transactions;
+
+  /// Where the month's plan comes from. Reading it rather than carrying
+  /// an authored limit is what keeps the dashboard's budget card and the
+  /// Budgets screen from quoting different numbers.
+  final BudgetRepository budgets;
   final DateTime Function() now;
 
   MockDataMode mode;
 
   /// Long enough that the loading state is real. Tests pass zero.
   final Duration delay;
-
-  /// A placeholder monthly limit, until budgets are a feature.
-  static const int _monthlyBudgetMinorUnits = 2200000;
 
   @override
   Future<DashboardData> load(DashboardPeriod period) async {
@@ -77,22 +83,21 @@ class MockDashboardRepository implements DashboardRepository {
         income: [for (final point in report.points) point.income],
         expenses: [for (final point in report.points) point.expenses],
       ),
-      budget: _budgetFor(period, report.expenses),
+      budget: await _budgetFor(period),
       savings: _savings,
       recentTransactions: await _recent(),
     );
   }
 
   /// Dashboard windows and report windows are the same windows.
-  ReportPeriod _asReportPeriod(DashboardPeriod period) =>
-      switch (period.kind) {
-        PeriodKind.thisMonth => ReportPeriod.month(now()),
-        PeriodKind.thisYear => ReportPeriod.year(now()),
-        PeriodKind.custom => ReportPeriod.custom(
-          from: period.start ?? now(),
-          to: period.end ?? now(),
-        ),
-      };
+  ReportPeriod _asReportPeriod(DashboardPeriod period) => switch (period.kind) {
+    PeriodKind.thisMonth => ReportPeriod.month(now()),
+    PeriodKind.thisYear => ReportPeriod.year(now()),
+    PeriodKind.custom => ReportPeriod.custom(
+      from: period.start ?? now(),
+      to: period.end ?? now(),
+    ),
+  };
 
   /// The five most recent transactions, whatever the selected period.
   ///
@@ -102,9 +107,8 @@ class MockDashboardRepository implements DashboardRepository {
     final view = await transactions.list(TransactionFilter.none);
     final today = now();
 
-    final rows = [
-      for (final group in view.groups) ...group.transactions,
-    ].take(5);
+    final rows = [for (final group in view.groups) ...group.transactions]
+        .take(5);
 
     return [
       for (final row in rows)
@@ -121,30 +125,38 @@ class MockDashboardRepository implements DashboardRepository {
   /// A budget, but only where a monthly limit means something.
   ///
   /// The card is titled "Monthly budget", so showing it against a year
-  /// would be comparing a year's spending with a month's limit — which is
-  /// what the authored version used to do, scaled, and it was never
-  /// honest. For other windows the section invites the user to set one.
-  BudgetOverview? _budgetFor(DashboardPeriod period, Money expenses) {
+  /// would be comparing a year's spending with a month's limit. For
+  /// other windows the section invites the user to set one.
+  Future<BudgetOverview?> _budgetFor(DashboardPeriod period) async {
     if (period.kind != PeriodKind.thisMonth) return null;
 
-    const limit = _monthlyBudgetMinorUnits;
-    final spent = expenses.minorUnits;
-    final remaining = limit - spent;
-    final ratio = spent / limit;
+    final today = now();
+    final board = await budgets.board(year: today.year, month: today.month);
+
+    final overall = board.overall;
+    if (overall == null) return null;
 
     return BudgetOverview(
-      limit: const Money(limit),
-      spent: expenses,
-      remaining: Money(remaining),
-      ratio: ratio,
-      status: switch (ratio) {
-        > 1.0 => BudgetStatus.overBudget,
-        >= 0.8 => BudgetStatus.closeToLimit,
-        _ => BudgetStatus.comfortable,
-      },
-      categoryCount: 6,
+      limit: overall.budget.amount,
+      spent: overall.spent,
+      remaining: overall.remaining,
+      ratio: overall.ratio,
+      status: _statusFor(overall.status),
+      // The categories the user actually budgeted, not a fixed number.
+      categoryCount: board.categories.length,
     );
   }
+
+  /// The budgets feature keeps four levels; the dashboard card shows
+  /// three. "Approaching" folds into "close to limit" rather than into
+  /// "on track": on a card the user only glances at, the earlier warning
+  /// is the more useful of the two.
+  BudgetStatus _statusFor(plans.BudgetStatus status) => switch (status) {
+    plans.BudgetStatus.over => BudgetStatus.overBudget,
+    plans.BudgetStatus.nearLimit ||
+    plans.BudgetStatus.approaching => BudgetStatus.closeToLimit,
+    plans.BudgetStatus.onTrack => BudgetStatus.comfortable,
+  };
 
   /// Still authored: there is no savings feature to read from yet.
   ///

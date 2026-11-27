@@ -31,7 +31,7 @@ abstract final class Routes {
   /// Tab 2 — full transaction history. Placeholder until Phase 05.
   static const String transactions = '/transactions';
 
-  /// Tab 3 — budgets. Placeholder until its phase.
+  /// Tab 3 — budgets.
   static const String budgets = '/budgets';
 
   /// Tab 4 — savings goals. Placeholder until its phase.
@@ -64,6 +64,18 @@ abstract final class Routes {
   static const String transactionEditPattern = '/transactions/:id/edit';
 
   static String transactionEdit(String id) => '/transactions/$id/edit';
+
+  /// Creating a budget. Full screen over the shell, like the transaction
+  /// form: it wants the display and a keyboard.
+  static const String budgetNew = '/budgets/new';
+
+  /// `?kind=overall` preselects the type, so "Set a monthly budget" lands
+  /// on a form that already knows what was pressed.
+  static String budgetNewOfKind(String kind) => '$budgetNew?kind=$kind';
+
+  static const String budgetEditPattern = '/budgets/:id/edit';
+
+  static String budgetEdit(String id) => '/budgets/$id/edit';
 
   /// Reports and analytics. Reached from the dashboard and from the
   /// transactions screen, not given a sixth tab — five is the bar's

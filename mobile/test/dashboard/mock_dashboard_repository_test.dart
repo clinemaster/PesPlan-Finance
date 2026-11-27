@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lifepilot_finance/features/dashboard/data/mock_dashboard_repository.dart';
 import 'package:lifepilot_finance/features/dashboard/domain/dashboard_data.dart';
 import 'package:lifepilot_finance/features/dashboard/domain/dashboard_period.dart';
+import 'package:lifepilot_finance/features/budgets/data/mock_budget_repository.dart';
 import 'package:lifepilot_finance/features/reports/data/mock_report_repository.dart';
 import 'package:lifepilot_finance/features/reports/domain/report_period.dart';
 import 'package:lifepilot_finance/features/transactions/data/mock_transaction_repository.dart';
@@ -17,13 +18,19 @@ MockDashboardRepository dashboardOver([List<Transaction>? seed]) {
     seed: seed,
     delay: Duration.zero,
   );
+  final reports = MockReportRepository(
+    transactions: transactions,
+    now: () => today,
+    delay: Duration.zero,
+  );
   return MockDashboardRepository(
-    reports: MockReportRepository(
-      transactions: transactions,
+    reports: reports,
+    transactions: transactions,
+    budgets: MockBudgetRepository(
+      reports: reports,
       now: () => today,
       delay: Duration.zero,
     ),
-    transactions: transactions,
     now: () => today,
     delay: Duration.zero,
   );
@@ -108,6 +115,11 @@ void main() {
         final dashboard = MockDashboardRepository(
           reports: reports,
           transactions: transactions,
+          budgets: MockBudgetRepository(
+            reports: reports,
+            now: () => today,
+            delay: Duration.zero,
+          ),
           now: () => today,
           delay: Duration.zero,
         );
@@ -121,28 +133,29 @@ void main() {
         );
 
         expect(onDashboard.income.minorUnits, inReports.income.minorUnits);
-        expect(
-          onDashboard.expenses.minorUnits,
-          inReports.expenses.minorUnits,
-        );
+        expect(onDashboard.expenses.minorUnits, inReports.expenses.minorUnits);
         expect(onDashboard.net.minorUnits, inReports.net.minorUnits);
       });
     }
   });
 
   group('budget', () {
-    test('is shown for a month, where a monthly limit means something',
-        () async {
-      final budget = (await load(const DashboardPeriod.thisMonth())).budget;
-      expect(budget, isNotNull);
-    });
+    test(
+      'is shown for a month, where a monthly limit means something',
+      () async {
+        final budget = (await load(const DashboardPeriod.thisMonth())).budget;
+        expect(budget, isNotNull);
+      },
+    );
 
-    test('is withheld for a year, which a monthly limit does not describe',
-        () async {
-      // The authored version scaled the limit by twelve and still called
-      // the card "Monthly budget", which was never honest.
-      expect((await load(const DashboardPeriod.thisYear())).budget, isNull);
-    });
+    test(
+      'is withheld for a year, which a monthly limit does not describe',
+      () async {
+        // The authored version scaled the limit by twelve and still called
+        // the card "Monthly budget", which was never honest.
+        expect((await load(const DashboardPeriod.thisYear())).budget, isNull);
+      },
+    );
 
     test('remaining is limit minus spent', () async {
       final budget = (await load(const DashboardPeriod.thisMonth())).budget!;
@@ -186,8 +199,7 @@ void main() {
 
   group('savings', () {
     test('previews are consistent with their own totals', () async {
-      final savings = (await load(const DashboardPeriod.thisMonth()))
-          .savings!;
+      final savings = (await load(const DashboardPeriod.thisMonth())).savings!;
 
       for (final goal in savings.previews) {
         expect(
@@ -207,8 +219,7 @@ void main() {
     });
 
     test('there are never more previews than goals', () async {
-      final savings = (await load(const DashboardPeriod.thisMonth()))
-          .savings!;
+      final savings = (await load(const DashboardPeriod.thisMonth())).savings!;
       expect(savings.previews.length, lessThanOrEqualTo(savings.activeGoals));
     });
   });
@@ -322,14 +333,15 @@ void main() {
       expect(data.isEmpty, isFalse);
     });
 
-    test('an account with no records reports empty without the switch',
-        () async {
-      // The real empty state, rather than the review one.
-      final data = await dashboardOver(
-        const [],
-      ).load(const DashboardPeriod.thisMonth());
+    test(
+      'an account with no records reports empty without the switch',
+      () async {
+        // The real empty state, rather than the review one.
+        final data = await dashboardOver(const [])
+            .load(const DashboardPeriod.thisMonth());
 
-      expect(data.isEmpty, isTrue);
-    });
+        expect(data.isEmpty, isTrue);
+      },
+    );
   });
 }

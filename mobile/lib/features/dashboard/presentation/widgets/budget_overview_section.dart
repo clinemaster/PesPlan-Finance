@@ -105,8 +105,21 @@ class BudgetOverviewSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                // Coloured from the card's own status rather than the
+                // component's default thresholds.
+                //
+                // AppProgressBar turns amber at 80% of its own accord,
+                // while this card calls 77% "Close to limit" — the
+                // budgets feature's earlier warning, folded into three
+                // levels here. Left to the default, the chip and the bar
+                // disagreed between 75% and 80%.
                 AppProgressBar(
                   value: current.ratio,
+                  color: switch (current.status) {
+                    BudgetStatus.overBudget => finance.expense,
+                    BudgetStatus.closeToLimit => finance.warning,
+                    BudgetStatus.comfortable => context.colors.primary,
+                  },
                   semanticLabel:
                       '${current.spent.semanticLabel} spent of '
                       '${current.limit.semanticLabel}',

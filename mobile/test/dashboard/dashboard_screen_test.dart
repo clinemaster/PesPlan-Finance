@@ -3,6 +3,8 @@ import 'package:lifepilot_finance/core/design_system/design_system.dart';
 import 'package:lifepilot_finance/features/dashboard/data/mock_dashboard_repository.dart';
 import 'package:lifepilot_finance/features/dashboard/domain/dashboard_period.dart';
 import 'package:lifepilot_finance/features/dashboard/presentation/providers/dashboard_providers.dart';
+import 'package:lifepilot_finance/features/dashboard/domain/dashboard_data.dart';
+import 'package:lifepilot_finance/features/dashboard/presentation/widgets/budget_overview_section.dart';
 import 'package:lifepilot_finance/features/dashboard/presentation/widgets/quick_actions.dart';
 
 import 'harness.dart';
@@ -148,18 +150,43 @@ void main() {
       await DashboardHarness.scrollTo(tester, find.text('Monthly budget'));
 
       expect(find.text('Monthly budget'), findsOneWidget);
-      // The limit is still authored — budgets are not a feature yet — but
-      // the spending against it is the period's real expenses.
-      expect(find.text('of TSh 2,200,000'), findsOneWidget);
 
       final data = await harness.container.read(dashboardProvider.future);
       final budget = data.budget!;
+
+      // The limit is the one the user set, read from the budgets
+      // feature, and the spending against it is the period's real
+      // expenses. Asserted against the data rather than a literal so the
+      // test does not have to be rewritten every time the seed moves.
+      expect(find.text('of ${budget.limit.format()}'), findsOneWidget);
       expect(budget.spent.minorUnits, data.expenses.minorUnits);
-      expect(
-        find.text('${budget.remaining.format()} left'),
-        findsOneWidget,
-      );
+      expect(find.text('${budget.remaining.format()} left'), findsOneWidget);
       expect(find.text(budget.status.label), findsOneWidget);
+    });
+
+    testWidgets('the bar agrees with the status beside it', (tester) async {
+      // The card folds the budgets feature's four levels into three, so
+      // it calls 77% "Close to limit" while AppProgressBar's own default
+      // only turns amber at 80% — an amber label over a blue bar until
+      // the colour was taken from the status.
+      final harness = await DashboardHarness.pump(tester);
+      await DashboardHarness.scrollTo(tester, find.text('Monthly budget'));
+
+      final budget = (await harness.container.read(dashboardProvider.future))
+          .budget!;
+      final bar = tester.widget<AppProgressBar>(
+        find.descendant(
+          of: find.byType(BudgetOverviewSection),
+          matching: find.byType(AppProgressBar),
+        ),
+      );
+      final context = tester.element(find.byType(BudgetOverviewSection));
+
+      expect(bar.color, switch (budget.status) {
+        BudgetStatus.overBudget => context.finance.expense,
+        BudgetStatus.closeToLimit => context.finance.warning,
+        BudgetStatus.comfortable => context.colors.primary,
+      });
     });
 
     testWidgets('links to the budgets tab', (tester) async {

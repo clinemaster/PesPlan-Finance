@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lifepilot_finance/app.dart';
 import 'package:lifepilot_finance/core/design_system/design_system.dart';
 import 'package:lifepilot_finance/core/storage/key_value_store.dart';
+import 'package:lifepilot_finance/features/budgets/data/budget_store.dart';
+import 'package:lifepilot_finance/features/budgets/data/mock_budget_repository.dart';
+import 'package:lifepilot_finance/features/budgets/presentation/providers/budget_providers.dart';
 import 'package:lifepilot_finance/features/dashboard/data/mock_dashboard_repository.dart';
 import 'package:lifepilot_finance/features/dashboard/presentation/providers/dashboard_providers.dart';
 import 'package:lifepilot_finance/features/onboarding/data/mock_auth_repository.dart';
@@ -41,9 +44,17 @@ Future<ProviderContainer> start(
     delay: Duration.zero,
   );
 
+  final budgets = MockBudgetRepository(
+    reports: reports,
+    now: () => now,
+    store: BudgetStore(store),
+    delay: Duration.zero,
+  );
+
   final container = ProviderContainer(
     overrides: [
       keyValueStoreProvider.overrideWithValue(store),
+      budgetRepositoryProvider.overrideWithValue(budgets),
       clockProvider.overrideWithValue(() => now),
       authRepositoryProvider.overrideWithValue(
         MockAuthRepository(delay: Duration.zero),
@@ -54,6 +65,7 @@ Future<ProviderContainer> start(
         MockDashboardRepository(
           reports: reports,
           transactions: transactions,
+          budgets: budgets,
           now: () => now,
           delay: Duration.zero,
         ),
@@ -83,6 +95,18 @@ Future<void> completeOnboarding(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Start using LifePilot'));
   await tester.pumpAndSettle();
+}
+
+/// Scrolling helper for the budgets list, which is longer than a phone.
+abstract final class BudgetsOnScreen {
+  static Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+    await tester.scrollUntilVisible(
+      finder,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -232,6 +256,96 @@ void main() {
       findsOneWidget,
       reason: 'signing out must survive a relaunch too',
     );
+  });
+
+  testWidgets('a budget set before a relaunch is still there', (tester) async {
+    final store = InMemoryKeyValueStore();
+
+    await start(tester, store);
+    await completeOnboarding(tester);
+
+    await tester.tap(find.text('Budgets'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Create budget'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, '75000');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Health'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create budget'));
+    await tester.pumpAndSettle();
+
+    // It reached disk, which is the part persistence is responsible for.
+    expect(
+      BudgetStore(store).read().map((b) => b.categoryId),
+      contains('health'),
+    );
+
+    // And it comes back on the next launch, on screen rather than only
+    // in storage.
+    await start(tester, store);
+    await tester.tap(find.text('Budgets'));
+    await tester.pumpAndSettle();
+    await BudgetsOnScreen.scrollTo(tester, find.text('Health'));
+
+    expect(find.text('Health'), findsOneWidget);
+    expect(find.textContaining('of TSh 75,000'), findsOneWidget);
+  });
+
+  testWidgets('deleting every budget does not hand back the seeded set', (
+    tester,
+  ) async {
+    // The store records "written, even if empty", so a user who clears
+    // their plans meets their own empty screen on the next launch rather
+    // than six budgets they never set.
+    final store = InMemoryKeyValueStore();
+
+    final container = await start(tester, store);
+    await completeOnboarding(tester);
+
+    final repository =
+        container.read(budgetRepositoryProvider) as MockBudgetRepository;
+
+    // Driven through runAsync, not awaited directly: inside testWidgets
+    // the clock is fake, and the repository's own `Future.delayed` —
+    // zero or not — creates a timer nothing advances, so a bare await
+    // deadlocks the test.
+    await tester.runAsync(() async {
+      for (final budget in repository.all.toList()) {
+        await repository.delete(budget.id);
+      }
+    });
+
+    expect(BudgetStore(store).read(), isEmpty);
+
+    await start(tester, store);
+    await tester.tap(find.text('Budgets'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start planning your spending.'), findsOneWidget);
+  });
+
+  testWidgets('a budget edited before a relaunch keeps its new limit', (
+    tester,
+  ) async {
+    final store = InMemoryKeyValueStore();
+
+    final container = await start(tester, store);
+    await completeOnboarding(tester);
+
+    final repository =
+        container.read(budgetRepositoryProvider) as MockBudgetRepository;
+    final food = repository.all.firstWhere((b) => b.categoryId == 'food');
+    await tester.runAsync(
+      () => repository.update(food.copyWith(amount: const Money(321000))),
+    );
+
+    await start(tester, store);
+    await tester.tap(find.text('Budgets'));
+    await tester.pumpAndSettle();
+    await BudgetsOnScreen.scrollTo(tester, find.text('Food'));
+
+    expect(find.textContaining('of TSh 321,000'), findsOneWidget);
   });
 
   testWidgets('the theme choice survives a relaunch', (tester) async {

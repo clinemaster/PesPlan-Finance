@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/time/clock.dart';
+import '../../../budgets/presentation/providers/budget_providers.dart';
 import '../../../reports/presentation/providers/report_providers.dart';
 import '../../../transactions/presentation/providers/transaction_providers.dart';
 
@@ -24,6 +25,7 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>(
     // same month.
     reports: ref.watch(reportRepositoryProvider),
     transactions: ref.watch(transactionRepositoryProvider),
+    budgets: ref.watch(budgetRepositoryProvider),
     now: ref.watch(clockProvider),
   ),
 );
@@ -79,6 +81,10 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   // this the user adds an expense, lands back on the dashboard, and finds
   // the totals unchanged.
   ref.watch(transactionListProvider);
+
+  // And on budgets, so setting or changing one moves the card that
+  // reports it.
+  ref.watch(budgetBoardProvider);
 
   final repository = ref.read(dashboardRepositoryProvider);
 

@@ -9,7 +9,7 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 04 | Navigation shell and dashboard | done |
 | 05 | Transactions — list, search, filter, add, edit, delete | done |
 | 06 | Reports — periods, breakdown, annual, year comparison | done |
-| 07 | Budgets | not started |
+| 07 | Budgets — overview, overall and category limits, create, edit, delete | done |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -25,8 +25,8 @@ flutter run            # starts at the welcome screen
 ```
 
 `main.dart` launches the real root widget and its router. After onboarding the app settles
-into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. Home and Activity are
-built; Budgets, Goals and Assistant are placeholders that say which phase they arrive in.
+into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. Home, Activity and
+Budgets are built; Goals and Assistant are placeholders that say which phase they arrive in.
 
 The Phase 02 design system showcase is still available at `/showcase`, reachable from
 Profile & settings, so the visual language stays reviewable without being what the app
@@ -155,6 +155,20 @@ lib/
 │   │   │   └── mock_report_repository.dart   derives reports from
 │   │   │                            recorded transactions
 │   │   └── presentation/            overview, annual report, comparison
+│   ├── budgets/
+│   │   ├── domain/                  Budget, BudgetKind, BudgetStatus and its
+│   │   │                            thresholds, BudgetProgress, BudgetBoard,
+│   │   │                            BudgetValidator — pure Dart
+│   │   ├── data/
+│   │   │   ├── budget_store.dart    the month's plans as JSON
+│   │   │   └── mock_budget_repository.dart   measures plans against the
+│   │   │                            report repository's spending
+│   │   └── presentation/
+│   │       ├── providers/           repository, thresholds, selected month,
+│   │       │                        board, write actions
+│   │       ├── widgets/             overall card, category row, status chip,
+│   │       │                        month stepper, detail sheet
+│   │       └── screens/             budgets, add/edit form, edit loader
 │   ├── shell/presentation/          the five-tab frame
 │   ├── settings/presentation/       profile, theme, review controls
 │   └── placeholders/presentation/   honest "not built yet" screen
@@ -213,7 +227,7 @@ and no ordering of six hues clears the floor. A breakdown with more parts uses
 
 ```bash
 flutter analyze                      # 0 issues
-flutter test                         # 126 tests
+flutter test                         # 596 tests
 flutter test --update-goldens test/golden   # regenerate the review screenshots
 ```
 
@@ -242,6 +256,11 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/reports/mock_report_repository_test.dart` | Totals, ranking, bucketing, metrics, comparison, determinism |
 | `test/reports/reports_screen_test.dart` | Period selection and stepping, empty periods, drill-down, entry points |
 | `test/reports/annual_and_comparison_test.dart` | Annual report, month drill-down, comparison and its warnings |
+| `test/budgets/budget_status_test.dart` | Every threshold boundary, the labels, and which levels ask for attention |
+| `test/budgets/budget_validator_test.dart` | Amount, category, note and the duplicate rule, including editing |
+| `test/budgets/mock_budget_repository_test.dart` | Remaining, overspend, ratios, ordering, unbudgeted spending, CRUD, seed integrity |
+| `test/budgets/budgets_screen_test.dart` | Month stepping, the overall card, the category list, all four statuses, the detail sheet, both empty states, two phone sizes |
+| `test/budgets/budget_crud_test.dart` | Create, edit, delete with confirmation, every validation rule, and the dashboard's budget card |
 | `test/persistence/persistence_test.dart` | Session, profile, transactions and preferences across a relaunch; unreadable stored state |
 | `test/persistence/relaunch_test.dart` | The whole app restarted over the same storage |
 
@@ -250,10 +269,11 @@ The widget tests boot the real `LifePilotApp` and override only the repositories
 this behaviour lives, and a test that pumped a screen directly would pass even if routing
 were broken.
 
-The dashboard tests run at phone sizes (393x851 and 320x568) rather than the 800x600
-default, because the default surface is wider and shorter than any Android device and hides
-exactly the overflow worth checking for. Two real overflows and one infinite-constraint
-crash were caught that way while building Phase 04.
+The screen tests run at phone sizes (393x851 and 320x568) rather than the 800x600 default,
+because the default surface is wider and shorter than any Android device and hides exactly
+the overflow worth checking for. Every overflow this project has found was invisible at the
+default size — including two in Phase 07: the budget detail sheet ran 90px past the bottom
+of its own sheet, and the empty-month invitation pushed its own button off a 320px screen.
 
 `mock_dashboard_repository_test.dart` does the arithmetic the app itself is forbidden from
 doing — net, remaining, ratios — so the mock's consistency is pinned once rather than
@@ -283,28 +303,35 @@ review rather than as a cross-platform CI gate.
   out as literals rather than computed, because that layer is what computes them, and
   putting the arithmetic in Dart would be the start of the duplicate finance engine the
   architecture exists to prevent.
-- **Four of the five tabs are placeholders.** Activity, Budgets, Goals and Assistant say
-  which phase they arrive in and show no figures, so a placeholder is never mistaken for a
-  finished screen in a screenshot.
+- **Two of the five tabs are placeholders.** Goals and Assistant say which phase they
+  arrive in and show no figures, so a placeholder is never mistaken for a finished screen in
+  a screenshot.
 - **Quick actions save nothing.** Add expense, add income and record-by-voice open screens
   that say so. No microphone is touched.
 - **The greeting does not re-render as time passes.** It is computed per build from an
   injectable clock, so an app left open from 11:59 to 12:01 keeps saying "Good morning"
   until something else rebuilds it. A timer for this is not worth the wakeups.
-- **The dashboard and the transaction list do not share data.** The dashboard's figures come
-  from its own mock of the reporting API, so a transaction added in Activity does not change
-  the dashboard's totals or its recent-activity list. Deriving the dashboard from recorded
-  transactions is real financial reporting, which Phase 05 is explicitly not allowed to
-  build — so the two stay separate until a backend joins them.
-- **Everything is derived from one source.** The dashboard reads the report repository,
-  reports read the transaction repository, and the transaction repository holds the records.
-  A figure cannot differ between two screens, and a test asserts the dashboard and the
-  reports screen agree for the same month.
-- **The budget limit and the savings goals are still authored.** Neither feature exists yet,
-  so there is nothing to read them from. The budget's *spending* is real — it is the period's
-  expenses — so the budget card and the Money out card above it cannot disagree. A monthly
-  budget is only shown for a month; against a year it would be comparing a year's spending
-  with a month's limit.
+- **Everything is derived from one source.** Budgets read the report repository, the
+  dashboard reads reports and budgets, reports read the transaction repository, and the
+  transaction repository holds the records. A figure cannot differ between two screens, and
+  tests assert that the dashboard agrees with reports for the same month and that a budget
+  agrees with both.
+- **Only the savings goals are still authored.** There is no savings feature to read them
+  from yet. The dashboard's budget card now quotes the limit the user actually set and
+  measures it against the period's own expenses, so the card, the Money out figure above it
+  and the Budgets screen cannot disagree. A monthly budget is only shown for a month;
+  against a year it would compare a year's spending with a month's limit.
+- **Budgets are monthly, and nothing else.** No weekly limits, no rollover of what went
+  unspent, no copying last month's plans forward, and no alerts — a budget is a limit for
+  one named month, measured when the screen is opened. The thresholds that decide "near
+  limit" are one injectable value (`BudgetThresholds`), so moving them is one decision
+  rather than an edit in every widget that colours a bar.
+- **The seeded budgets are review data.** Six plans for the current month, sized against
+  what the generated history actually spends so the screen opens on a real mix — most
+  categories fine, one close, one over — rather than everything comfortably green. They are
+  written once on first launch and are the user's from then on: editing or deleting them
+  persists, and deleting the last one leaves an empty screen rather than handing the seed
+  back.
 - **Three years of history, generated.** `TransactionHistory` produces about 340 records from
   a fixed seed, so the same clock always yields the same figures: a report opened twice reads
   the same both times. The current month is hand-written; everything older is generated.
@@ -319,6 +346,7 @@ State survives a relaunch, in `shared_preferences` behind `KeyValueStore`:
 |---|---|---|
 | Session and profile | `session.*` | Written when setup completes, and on later edits |
 | Transactions | `transactions.all` | The whole list as JSON, rewritten on every change |
+| Budgets | `budgets.all` | Same arrangement; written even when empty, so deleting the last budget is not undone by the seed |
 | Theme | `settings.themeMode` | |
 
 Three things are worth knowing.
@@ -329,8 +357,8 @@ goes straight to their dashboard. An async bootstrap would paint the welcome scr
 frame first, and that flash is more expensive than the few milliseconds of reading one file.
 
 **Unreadable stored state is treated as absent, never fatal.** A damaged session reads as no
-session and a damaged transaction list reads as empty. Signing in again is recoverable; a
-crash loop on launch is not.
+session, and a damaged transaction or budget list reads as empty. Signing in again is
+recoverable, and losing a plan is recoverable; a crash loop on launch is not.
 
 **No credential is stored here.** `shared_preferences` is an unencrypted file. What is kept
 is a name, an email and the answers from setup — all of it already on screen whenever the app
