@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/time/clock.dart';
 import '../../../budgets/presentation/providers/budget_providers.dart';
+import '../../../savings/presentation/providers/savings_providers.dart';
 import '../../../reports/presentation/providers/report_providers.dart';
 import '../../../transactions/presentation/providers/transaction_providers.dart';
 
@@ -26,6 +27,7 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>(
     reports: ref.watch(reportRepositoryProvider),
     transactions: ref.watch(transactionRepositoryProvider),
     budgets: ref.watch(budgetRepositoryProvider),
+    savings: ref.watch(savingsRepositoryProvider),
     now: ref.watch(clockProvider),
   ),
 );
@@ -85,6 +87,10 @@ final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   // And on budgets, so setting or changing one moves the card that
   // reports it.
   ref.watch(budgetBoardProvider);
+
+  // And on savings, so a contribution recorded in Goals is reflected by
+  // the preview the moment the user comes back.
+  ref.watch(savingsBoardProvider);
 
   final repository = ref.read(dashboardRepositoryProvider);
 

@@ -4,6 +4,7 @@ import 'package:lifepilot_finance/features/dashboard/domain/dashboard_data.dart'
 import 'package:lifepilot_finance/features/dashboard/domain/dashboard_period.dart';
 import 'package:lifepilot_finance/features/budgets/data/mock_budget_repository.dart';
 import 'package:lifepilot_finance/features/reports/data/mock_report_repository.dart';
+import 'package:lifepilot_finance/features/savings/data/mock_savings_repository.dart';
 import 'package:lifepilot_finance/features/reports/domain/report_period.dart';
 import 'package:lifepilot_finance/features/transactions/data/mock_transaction_repository.dart';
 import 'package:lifepilot_finance/features/transactions/domain/transaction.dart';
@@ -31,6 +32,7 @@ MockDashboardRepository dashboardOver([List<Transaction>? seed]) {
       now: () => today,
       delay: Duration.zero,
     ),
+    savings: MockSavingsRepository(now: () => today, delay: Duration.zero),
     now: () => today,
     delay: Duration.zero,
   );
@@ -117,6 +119,10 @@ void main() {
           transactions: transactions,
           budgets: MockBudgetRepository(
             reports: reports,
+            now: () => today,
+            delay: Duration.zero,
+          ),
+          savings: MockSavingsRepository(
             now: () => today,
             delay: Duration.zero,
           ),

@@ -39,8 +39,11 @@ void main() {
         'plays the reporting API while the data is mocked',
     // Measures budgets against recorded spending. Stands in for the
     // server; replaced in Phase 13 along with its arithmetic.
-    'mock_budget_repository.dart':
-        'measures budgets while the data is mocked',
+    'mock_budget_repository.dart': 'measures budgets while the data is mocked',
+    // Measures goals against their own movements. Stands in for the
+    // server; replaced in Phase 16 along with its arithmetic.
+    'mock_savings_repository.dart':
+        'measures savings goals while the data is mocked',
     // Charts turn a value into a pixel, which the heuristic exempts.
     'charts.dart': 'lays out chart marks',
   };

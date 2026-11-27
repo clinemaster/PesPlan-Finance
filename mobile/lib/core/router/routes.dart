@@ -34,7 +34,7 @@ abstract final class Routes {
   /// Tab 3 — budgets.
   static const String budgets = '/budgets';
 
-  /// Tab 4 — savings goals. Placeholder until its phase.
+  /// Tab 4 — savings goals.
   static const String goals = '/goals';
 
   /// Tab 5 — the assistant. Placeholder until its phase.
@@ -76,6 +76,32 @@ abstract final class Routes {
   static const String budgetEditPattern = '/budgets/:id/edit';
 
   static String budgetEdit(String id) => '/budgets/$id/edit';
+
+  /// Creating a goal. Full screen over the shell, like the other forms:
+  /// it wants the display and a keyboard.
+  static const String goalNew = '/goals/new';
+
+  /// One goal, with its history. Declared after [goalNew] in the router,
+  /// because `/goals/new` would otherwise match `:id` and open a detail
+  /// screen for a goal called "new".
+  static const String goalDetailPattern = '/goals/:id';
+
+  static String goalDetail(String id) => '/goals/$id';
+
+  static const String goalEditPattern = '/goals/:id/edit';
+
+  static String goalEdit(String id) => '/goals/$id/edit';
+
+  /// Money in, and money back out. Two paths rather than a query
+  /// parameter: they are different actions with different rules, and a
+  /// link that reads `/withdraw` cannot be mistaken for the other one.
+  static const String goalContributePattern = '/goals/:id/add';
+
+  static String goalContribute(String id) => '/goals/$id/add';
+
+  static const String goalWithdrawPattern = '/goals/:id/withdraw';
+
+  static String goalWithdraw(String id) => '/goals/$id/withdraw';
 
   /// Reports and analytics. Reached from the dashboard and from the
   /// transactions screen, not given a sixth tab — five is the bar's

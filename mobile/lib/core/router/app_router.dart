@@ -7,6 +7,12 @@ import '../../features/budgets/presentation/screens/budget_edit_screen.dart';
 import '../../features/budgets/presentation/screens/budget_form_screen.dart';
 import '../../features/budgets/presentation/screens/budgets_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/savings/domain/goal_movement.dart';
+import '../../features/savings/presentation/screens/goal_detail_screen.dart';
+import '../../features/savings/presentation/screens/goal_edit_screen.dart';
+import '../../features/savings/presentation/screens/goal_form_screen.dart';
+import '../../features/savings/presentation/screens/goal_movement_screen.dart';
+import '../../features/savings/presentation/screens/goals_screen.dart';
 import '../../features/onboarding/presentation/providers/auth_providers.dart';
 import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../../features/onboarding/presentation/screens/completion_screen.dart';
@@ -143,13 +149,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.goals,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Goals',
-                  icon: AppIcons.goals,
-                  message:
-                      'Name what you are saving for, set a target, and '
-                      'watch it fill up. Coming in a later phase.',
-                ),
+                builder: (context, state) => const GoalsScreen(),
               ),
             ],
           ),
@@ -207,6 +207,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.budgetEditPattern,
         builder: (context, state) =>
             BudgetEditScreen(id: state.pathParameters['id']!),
+      ),
+      // Declared before the `:id` route below, which would otherwise
+      // match `/goals/new` and open a detail screen for a goal called
+      // "new".
+      GoRoute(
+        path: Routes.goalNew,
+        builder: (context, state) => const GoalFormScreen(),
+      ),
+      GoRoute(
+        path: Routes.goalEditPattern,
+        builder: (context, state) =>
+            GoalEditScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: Routes.goalContributePattern,
+        builder: (context, state) => GoalMovementScreen(
+          goalId: state.pathParameters['id']!,
+          kind: MovementKind.contribution,
+        ),
+      ),
+      GoRoute(
+        path: Routes.goalWithdrawPattern,
+        builder: (context, state) => GoalMovementScreen(
+          goalId: state.pathParameters['id']!,
+          kind: MovementKind.withdrawal,
+        ),
+      ),
+      GoRoute(
+        path: Routes.goalDetailPattern,
+        builder: (context, state) =>
+            GoalDetailScreen(id: state.pathParameters['id']!),
       ),
       GoRoute(
         path: Routes.reports,

@@ -4,6 +4,8 @@ import 'package:lifepilot_finance/app.dart';
 import 'package:lifepilot_finance/features/budgets/data/mock_budget_repository.dart';
 import 'package:lifepilot_finance/features/budgets/presentation/providers/budget_providers.dart';
 import 'package:lifepilot_finance/features/dashboard/data/mock_dashboard_repository.dart';
+import 'package:lifepilot_finance/features/savings/data/mock_savings_repository.dart';
+import 'package:lifepilot_finance/features/savings/presentation/providers/savings_providers.dart';
 import 'package:lifepilot_finance/features/dashboard/presentation/providers/dashboard_providers.dart';
 import 'package:lifepilot_finance/features/onboarding/data/mock_auth_repository.dart';
 import 'package:lifepilot_finance/features/onboarding/presentation/providers/auth_providers.dart';
@@ -73,6 +75,8 @@ class DashboardHarness {
       delay: Duration.zero,
     );
 
+    final savings = MockSavingsRepository(now: clock, delay: Duration.zero);
+
     final container = ProviderContainer(
       overrides: [
         authRepositoryProvider.overrideWithValue(
@@ -93,11 +97,13 @@ class DashboardHarness {
         // never advances, which leaves a pending timer at teardown.
         reportRepositoryProvider.overrideWithValue(reports),
         budgetRepositoryProvider.overrideWithValue(budgets),
+        savingsRepositoryProvider.overrideWithValue(savings),
         dashboardRepositoryProvider.overrideWithValue(
           MockDashboardRepository(
             reports: reports,
             transactions: transactions,
             budgets: budgets,
+            savings: savings,
             now: clock,
             delay: Duration.zero,
           ),

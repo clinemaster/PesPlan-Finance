@@ -12,6 +12,10 @@ import 'package:lifepilot_finance/features/onboarding/data/mock_auth_repository.
 import 'package:lifepilot_finance/features/onboarding/presentation/providers/auth_providers.dart';
 import 'package:lifepilot_finance/features/reports/data/mock_report_repository.dart';
 import 'package:lifepilot_finance/features/reports/presentation/providers/report_providers.dart';
+import 'package:lifepilot_finance/features/savings/data/mock_savings_repository.dart';
+import 'package:lifepilot_finance/features/savings/data/savings_store.dart';
+import 'package:lifepilot_finance/features/savings/domain/goal_movement.dart';
+import 'package:lifepilot_finance/features/savings/presentation/providers/savings_providers.dart';
 import 'package:lifepilot_finance/features/transactions/data/mock_transaction_repository.dart';
 import 'package:lifepilot_finance/features/transactions/data/transaction_store.dart';
 import 'package:lifepilot_finance/features/transactions/presentation/providers/transaction_providers.dart';
@@ -51,10 +55,17 @@ Future<ProviderContainer> start(
     delay: Duration.zero,
   );
 
+  final savings = MockSavingsRepository(
+    now: () => now,
+    store: SavingsStore(store),
+    delay: Duration.zero,
+  );
+
   final container = ProviderContainer(
     overrides: [
       keyValueStoreProvider.overrideWithValue(store),
       budgetRepositoryProvider.overrideWithValue(budgets),
+      savingsRepositoryProvider.overrideWithValue(savings),
       clockProvider.overrideWithValue(() => now),
       authRepositoryProvider.overrideWithValue(
         MockAuthRepository(delay: Duration.zero),
@@ -66,6 +77,7 @@ Future<ProviderContainer> start(
           reports: reports,
           transactions: transactions,
           budgets: budgets,
+          savings: savings,
           now: () => now,
           delay: Duration.zero,
         ),
@@ -346,6 +358,127 @@ void main() {
     await BudgetsOnScreen.scrollTo(tester, find.text('Food'));
 
     expect(find.textContaining('of TSh 321,000'), findsOneWidget);
+  });
+
+  testWidgets('a goal created before a relaunch is still there', (
+    tester,
+  ) async {
+    final store = InMemoryKeyValueStore();
+
+    await start(tester, store);
+    await completeOnboarding(tester);
+
+    await tester.tap(find.text('Goals'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Create goal'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'Boda boda');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(1), '2500000');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create goal'));
+    await tester.pumpAndSettle();
+
+    // It reached disk, which is the part persistence is responsible for.
+    expect(
+      SavingsStore(store).readGoals().map((g) => g.name),
+      contains('Boda boda'),
+    );
+
+    // And it comes back on the next launch, on screen rather than only
+    // in storage.
+    await start(tester, store);
+    await tester.tap(find.text('Goals'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('Boda boda'),
+      find.byType(ListView).last,
+      const Offset(0, -220),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Boda boda'), findsOneWidget);
+    expect(find.text('TSh 0 of TSh 2,500,000'), findsOneWidget);
+  });
+
+  testWidgets('a contribution survives a relaunch, with its history', (
+    tester,
+  ) async {
+    final store = InMemoryKeyValueStore();
+
+    final container = await start(tester, store);
+    await completeOnboarding(tester);
+
+    final repository =
+        container.read(savingsRepositoryProvider) as MockSavingsRepository;
+    final goal = repository.allGoals.first;
+
+    // Driven through runAsync, not awaited directly: inside testWidgets
+    // the clock is fake, and the repository's own `Future.delayed` —
+    // zero or not — creates a timer nothing advances, so a bare await
+    // deadlocks the test.
+    await tester.runAsync(
+      () => repository.addMovement(
+        GoalMovement(
+          id: 'relaunch-movement',
+          goalId: goal.id,
+          kind: MovementKind.contribution,
+          amount: const Money(125000),
+          date: now,
+          recordedAt: now,
+          description: 'Before the relaunch',
+        ),
+      ),
+    );
+
+    expect(
+      SavingsStore(store).readMovements().map((m) => m.description),
+      contains('Before the relaunch'),
+    );
+
+    await start(tester, store);
+    await tester.tap(find.text('Goals'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(goal.name));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('Before the relaunch'),
+      find.byType(ListView).last,
+      const Offset(0, -220),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before the relaunch'), findsOneWidget);
+    expect(find.text('+TSh 125,000'), findsOneWidget);
+  });
+
+  testWidgets('deleting every goal does not hand back the seeded set', (
+    tester,
+  ) async {
+    // The store records "written, even if empty", so a user who clears
+    // their goals meets their own empty screen on the next launch rather
+    // than four goals they never set.
+    final store = InMemoryKeyValueStore();
+
+    final container = await start(tester, store);
+    await completeOnboarding(tester);
+
+    final repository =
+        container.read(savingsRepositoryProvider) as MockSavingsRepository;
+    await tester.runAsync(() async {
+      for (final goal in repository.allGoals.toList()) {
+        await repository.delete(goal.id);
+      }
+    });
+
+    expect(SavingsStore(store).readGoals(), isEmpty);
+    expect(SavingsStore(store).readMovements(), isEmpty);
+
+    await start(tester, store);
+    await tester.tap(find.text('Goals'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No savings goals yet.'), findsOneWidget);
   });
 
   testWidgets('the theme choice survives a relaunch', (tester) async {

@@ -10,6 +10,7 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 05 | Transactions — list, search, filter, add, edit, delete | done |
 | 06 | Reports — periods, breakdown, annual, year comparison | done |
 | 07 | Budgets — overview, overall and category limits, create, edit, delete | done |
+| 08 | Savings goals — progress, contributions, withdrawals, history | done |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -25,8 +26,8 @@ flutter run            # starts at the welcome screen
 ```
 
 `main.dart` launches the real root widget and its router. After onboarding the app settles
-into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. Home, Activity and
-Budgets are built; Goals and Assistant are placeholders that say which phase they arrive in.
+into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. Only Assistant is still a
+placeholder, and it says which phase it arrives in.
 
 The Phase 02 design system showcase is still available at `/showcase`, reachable from
 Profile & settings, so the visual language stays reviewable without being what the app
@@ -169,6 +170,21 @@ lib/
 │   │       ├── widgets/             overall card, category row, status chip,
 │   │       │                        month stepper, detail sheet
 │   │       └── screens/             budgets, add/edit form, edit loader
+│   ├── savings/
+│   │   ├── domain/                  SavingsGoal, GoalIcon, GoalMovement,
+│   │   │                            GoalProgress, SavingsBoard, GoalTiming,
+│   │   │                            SavingsValidator — pure Dart
+│   │   ├── data/
+│   │   │   ├── savings_store.dart   goals and movements as JSON
+│   │   │   └── mock_savings_repository.dart   derives every balance from
+│   │   │                            the goal's own movements
+│   │   └── presentation/
+│   │       ├── providers/           repository, board, one goal, its
+│   │       │                        movements, write actions
+│   │       ├── widgets/             total card, goal card, movement row,
+│   │       │                        icon picker
+│   │       └── screens/             goals, goal detail, add/edit form,
+│   │                                edit loader, contribute/withdraw
 │   ├── shell/presentation/          the five-tab frame
 │   ├── settings/presentation/       profile, theme, review controls
 │   └── placeholders/presentation/   honest "not built yet" screen
@@ -227,7 +243,7 @@ and no ordering of six hues clears the floor. A breakdown with more parts uses
 
 ```bash
 flutter analyze                      # 0 issues
-flutter test                         # 596 tests
+flutter test                         # 743 tests
 flutter test --update-goldens test/golden   # regenerate the review screenshots
 ```
 
@@ -261,6 +277,11 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/budgets/mock_budget_repository_test.dart` | Remaining, overspend, ratios, ordering, unbudgeted spending, CRUD, seed integrity |
 | `test/budgets/budgets_screen_test.dart` | Month stepping, the overall card, the category list, all four statuses, the detail sheet, both empty states, two phone sizes |
 | `test/budgets/budget_crud_test.dart` | Create, edit, delete with confirmation, every validation rule, and the dashboard's budget card |
+| `test/savings/savings_validator_test.dart` | Name, target, opening amount, dates, contribution and withdrawal rules, and the time-remaining labels |
+| `test/savings/mock_savings_repository_test.dart` | Balances derived from movements, completion, ordering, totals, CRUD, the withdrawal backstop, seed integrity |
+| `test/savings/goals_screen_test.dart` | The total, goal cards, ordering, the completed section, the empty state, dashboard entry points, two phone sizes |
+| `test/savings/goal_crud_test.dart` | Create, edit, delete with confirmation, every validation rule, and the completion warning |
+| `test/savings/goal_movements_test.dart` | Contributions, withdrawals, withdrawal limits, history, and that neither touches transactions |
 | `test/persistence/persistence_test.dart` | Session, profile, transactions and preferences across a relaunch; unreadable stored state |
 | `test/persistence/relaunch_test.dart` | The whole app restarted over the same storage |
 
@@ -303,29 +324,44 @@ review rather than as a cross-platform CI gate.
   out as literals rather than computed, because that layer is what computes them, and
   putting the arithmetic in Dart would be the start of the duplicate finance engine the
   architecture exists to prevent.
-- **Two of the five tabs are placeholders.** Goals and Assistant say which phase they
-  arrive in and show no figures, so a placeholder is never mistaken for a finished screen in
-  a screenshot.
+- **One of the five tabs is a placeholder.** Assistant says which phase it arrives in and
+  shows no figures, so a placeholder is never mistaken for a finished screen in a
+  screenshot.
 - **Quick actions save nothing.** Add expense, add income and record-by-voice open screens
   that say so. No microphone is touched.
 - **The greeting does not re-render as time passes.** It is computed per build from an
   injectable clock, so an app left open from 11:59 to 12:01 keeps saying "Good morning"
   until something else rebuilds it. A timer for this is not worth the wakeups.
 - **Everything is derived from one source.** Budgets read the report repository, the
-  dashboard reads reports and budgets, reports read the transaction repository, and the
-  transaction repository holds the records. A figure cannot differ between two screens, and
-  tests assert that the dashboard agrees with reports for the same month and that a budget
-  agrees with both.
-- **Only the savings goals are still authored.** There is no savings feature to read them
-  from yet. The dashboard's budget card now quotes the limit the user actually set and
-  measures it against the period's own expenses, so the card, the Money out figure above it
-  and the Budgets screen cannot disagree. A monthly budget is only shown for a month;
-  against a year it would compare a year's spending with a month's limit.
+  dashboard reads reports, budgets and savings, reports read the transaction repository, and
+  the transaction repository holds the records. A figure cannot differ between two screens,
+  and tests assert that the dashboard agrees with reports for the same month and that a
+  budget agrees with both.
+- **Nothing on the dashboard is authored any more.** Each card reads the feature that owns
+  it, savings included, so the preview and the Goals screen cannot quote different totals. A
+  monthly budget is only shown for a month; against a year it would compare a year's
+  spending with a month's limit.
+- **Saving is not spending.** A contribution is recorded against its goal and nowhere else:
+  it never reaches the transaction repository, so it cannot appear as an expense, move the
+  month's net, or be counted twice by the reports. That is a product decision as much as a
+  technical one — money set aside has not left the user's hands — and two tests pin it.
+- **A goal's balance is its history, added up.** Nothing stores "saved so far"; it is
+  derived from the goal's movements every time, so the figure on the card and the list
+  behind it cannot drift apart. Withdrawals are capped at what the goal holds, in the form
+  and again in the repository, because a goal cannot hold less than nothing.
+- **Savings goals are deliberately plain.** No interest, no projections, no "you will reach
+  this by March at your current rate", no reminders. A target, what is in it, and what is
+  left — the forecasting is a later phase's decision, and inventing a rate from four
+  contributions would be a prediction the app cannot stand behind.
 - **Budgets are monthly, and nothing else.** No weekly limits, no rollover of what went
   unspent, no copying last month's plans forward, and no alerts — a budget is a limit for
   one named month, measured when the screen is opened. The thresholds that decide "near
   limit" are one injectable value (`BudgetThresholds`), so moving them is one decision
   rather than an edit in every widget that colours a bar.
+- **The seeded goals are review data too.** Four goals with their movement history, one of
+  them finished and one with a withdrawal in it, so the completed section and both
+  directions of movement are visible without anyone having to create data first. Same rule
+  as the budgets: written once, the user's from then on.
 - **The seeded budgets are review data.** Six plans for the current month, sized against
   what the generated history actually spends so the screen opens on a real mix — most
   categories fine, one close, one over — rather than everything comfortably green. They are
@@ -347,6 +383,8 @@ State survives a relaunch, in `shared_preferences` behind `KeyValueStore`:
 | Session and profile | `session.*` | Written when setup completes, and on later edits |
 | Transactions | `transactions.all` | The whole list as JSON, rewritten on every change |
 | Budgets | `budgets.all` | Same arrangement; written even when empty, so deleting the last budget is not undone by the seed |
+| Savings goals | `savings.goals` | Plans only — no balance is stored |
+| Goal movements | `savings.movements` | Every contribution and withdrawal; the balances are derived from these |
 | Theme | `settings.themeMode` | |
 
 Three things are worth knowing.

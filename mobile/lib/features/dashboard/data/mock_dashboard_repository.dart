@@ -1,8 +1,9 @@
-import '../../../core/money/money.dart';
 import '../../budgets/domain/budget_repository.dart';
 import '../../budgets/domain/budget_status.dart' as plans;
 import '../../reports/domain/report_period.dart';
 import '../../reports/domain/report_repository.dart';
+import '../../savings/domain/goal_timing.dart';
+import '../../savings/domain/savings_repository.dart';
 import '../../transactions/domain/date_labels.dart';
 import '../../transactions/domain/transaction_filter.dart';
 import '../../transactions/domain/transaction_repository.dart';
@@ -33,19 +34,19 @@ enum MockDataMode { populated, empty }
 /// transaction repository directly. The dashboard is now a summary of the
 /// same truth rather than a parallel one.
 ///
-/// ## What is still authored, and why
+/// ## Nothing here is authored any more
 ///
-/// Only the savings goals. There is no savings feature to read them from
-/// yet, so they stay a placeholder until that phase. The budget card
-/// reads the budgets feature, so the limit it quotes is the one the user
-/// actually set and the spending against it is the period's own
-/// expenses — the card, the Money out figure above it and the Budgets
-/// screen cannot disagree.
+/// Every card reads the feature that owns it: totals and the trend from
+/// reports, recent rows from transactions, the budget from budgets and
+/// the savings preview from savings. The dashboard is a summary of the
+/// same truth rather than a parallel one, so a figure cannot differ
+/// between it and the screen one tap away.
 class MockDashboardRepository implements DashboardRepository {
   MockDashboardRepository({
     required this.reports,
     required this.transactions,
     required this.budgets,
+    required this.savings,
     required this.now,
     this.mode = MockDataMode.populated,
     this.delay = const Duration(milliseconds: 250),
@@ -58,6 +59,11 @@ class MockDashboardRepository implements DashboardRepository {
   /// an authored limit is what keeps the dashboard's budget card and the
   /// Budgets screen from quoting different numbers.
   final BudgetRepository budgets;
+
+  /// Where the goals come from. Reading them rather than carrying
+  /// authored goals is what keeps the dashboard's preview and the Goals
+  /// screen from quoting different totals.
+  final SavingsRepository savings;
   final DateTime Function() now;
 
   MockDataMode mode;
@@ -84,7 +90,7 @@ class MockDashboardRepository implements DashboardRepository {
         expenses: [for (final point in report.points) point.expenses],
       ),
       budget: await _budgetFor(period),
-      savings: _savings,
+      savings: await _savingsPreview(),
       recentTransactions: await _recent(),
     );
   }
@@ -158,31 +164,42 @@ class MockDashboardRepository implements DashboardRepository {
     plans.BudgetStatus.onTrack => BudgetStatus.comfortable,
   };
 
-  /// Still authored: there is no savings feature to read from yet.
+  /// The savings card: everything set aside, and the two goals closest
+  /// to done.
   ///
-  /// Three goals, two previewed. The third has nothing saved, which is why
-  /// the previews do not add up to the headline — a real account looks
-  /// like that, and a preview that always reconciles hides that it is one.
-  static const SavingsOverview _savings = SavingsOverview(
-    activeGoals: 3,
-    totalSaved: Money(750000),
-    totalTarget: Money(3200000),
-    ratio: 0.23,
-    previews: [
-      GoalPreview(
-        name: 'Emergency fund',
-        saved: Money(450000),
-        target: Money(1000000),
-        ratio: 0.45,
-        caption: 'Started in June',
-      ),
-      GoalPreview(
-        name: 'New laptop',
-        saved: Money(300000),
-        target: Money(1500000),
-        ratio: 0.20,
-        caption: 'Target: March 2027',
-      ),
-    ],
-  );
+  /// Not scoped to the selected period, and deliberately so. Savings are
+  /// a balance, not a movement — "how much have I put aside this month"
+  /// is a different question from the one this card answers, and
+  /// shrinking the figure when someone switches to a shorter window
+  /// would read as money disappearing.
+  Future<SavingsOverview?> _savingsPreview() async {
+    final board = await savings.board();
+
+    // No goals is not zero goals worth of progress: the section renders
+    // an invitation instead of a bar at 0%.
+    if (board.active.isEmpty) return null;
+
+    final today = now();
+
+    return SavingsOverview(
+      activeGoals: board.activeCount,
+      totalSaved: board.totalSaved,
+      totalTarget: board.totalTarget,
+      ratio: board.ratio,
+      previews: [
+        for (final progress in board.active.take(2))
+          GoalPreview(
+            name: progress.goal.name,
+            saved: progress.saved,
+            target: progress.goal.target,
+            ratio: progress.ratio,
+            caption: GoalTiming.caption(
+              progress.goal.targetDate,
+              progress.goal.createdAt,
+              today,
+            ),
+          ),
+      ],
+    );
+  }
 }

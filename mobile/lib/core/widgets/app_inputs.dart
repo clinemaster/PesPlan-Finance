@@ -74,10 +74,18 @@ class AppTextField extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: AppTypography.label.copyWith(
-                color: enabled ? finance.textPrimary : finance.textDisabled,
+            // Flexible, not bare: a label long enough to be a question
+            // overflows a 320px screen, and the required marker beside it
+            // leaves no room to shrink into. Wrapping is better than a
+            // yellow-and-black stripe.
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.label.copyWith(
+                  color: enabled ? finance.textPrimary : finance.textDisabled,
+                ),
               ),
             ),
             if (isRequired)
