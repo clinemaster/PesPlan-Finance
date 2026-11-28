@@ -1,22 +1,54 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/auth_config.dart';
+import '../../../../core/storage/credential_store.dart';
 import '../../../../core/storage/key_value_store.dart';
 import '../../data/session_store.dart';
 
+import '../../data/credential_vault.dart';
+import '../../data/google_auth_repository.dart';
+import '../../data/google_sign_in_client.dart';
 import '../../data/mock_auth_repository.dart';
 import '../../domain/auth_repository.dart';
 import '../../domain/auth_result.dart';
 import '../../domain/auth_user.dart';
+import '../../domain/session_restore.dart';
+
+/// What this build was compiled to sign in with.
+///
+/// A provider rather than a bare constant so a test can state the case it is
+/// testing — the copy on the welcome screen differs between a real build and
+/// a mock one, and both versions need a test. Overriding this does not change
+/// which repository is used if [authRepositoryProvider] is also overridden,
+/// which is the point: a widget test can describe a configured build without
+/// a test ever touching a platform channel.
+final authConfigProvider = Provider<AuthConfig>(
+  (ref) => AuthConfig.fromEnvironment,
+);
 
 /// Where sign-in actually happens.
 ///
-/// Phase 03 binds this to [MockAuthRepository]. Phase 12 overrides it with a
-/// Google-backed implementation; tests override it with a repository pinned
-/// to the scenario under test. Nothing else in the feature constructs a
-/// repository, so there is exactly one line to change.
-final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => MockAuthRepository(),
-);
+/// ## The one place that chooses
+///
+/// Phases 03 to 11 bound this to [MockAuthRepository]. Phase 12 added the
+/// real one, and this is the whole of the swap: the configuration decides,
+/// everything above here sees [AuthRepository] either way, and tests override
+/// it with a repository pinned to the scenario under test.
+///
+/// The default — a clone with no `--dart-define` and so no client id — is the
+/// mock, because a build that cannot start without someone first provisioning
+/// OAuth credentials is a build nobody can look at. See [AuthConfig].
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  final config = ref.watch(authConfigProvider);
+
+  return switch (config.provider) {
+    SignInProvider.mock => MockAuthRepository(),
+    SignInProvider.google => GoogleAuthRepository(
+      client: PluginGoogleSignInClient(config: config),
+      vault: CredentialVault(ref.read(credentialStoreProvider)),
+    ),
+  };
+});
 
 /// The outcome the mock will produce next.
 ///
@@ -156,6 +188,24 @@ class AuthController extends Notifier<AuthState> {
       AuthCancelled() => const AuthDismissed(),
       AuthFailed(:final message) => AuthErrored(message),
     };
+  }
+
+  /// Replaces the stored credential for a session restored from disk.
+  ///
+  /// ## Why this runs at launch and nothing waits for it
+  ///
+  /// An ID token is good for about an hour, so the credential belonging to a
+  /// user who opens the app the next morning is always stale. Refreshing it
+  /// needs no interaction — the provider already knows the account — so it
+  /// happens in the background while the user looks at their dashboard.
+  ///
+  /// Nothing waits for it and nothing can fail because of it. The session on
+  /// screen came from storage and stands regardless: see [SessionRestore] for
+  /// why a failed refresh must never sign anyone out.
+  Future<SessionRestore> refreshSession() async {
+    if (state is! AuthAuthenticated) return SessionRestore.needsUser;
+
+    return ref.read(authRepositoryProvider).restoreSession();
   }
 
   /// Clears a cancellation or error note so the screen returns to its

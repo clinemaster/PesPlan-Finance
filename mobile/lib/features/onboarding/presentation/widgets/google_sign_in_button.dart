@@ -79,14 +79,25 @@ class GoogleSignInButton extends StatelessWidget {
                           children: [
                             GoogleLogo(size: AppIconSize.md),
                             const SizedBox(width: AppSpacing.md),
-                            Text(
-                              label,
-                              style: AppTypography.button.copyWith(
-                                // Google's own button uses a near-black
-                                // label on white, not our ink colour.
-                                color: enabled
-                                    ? const Color(0xFF3C4043)
-                                    : finance.textDisabled,
+                            // Flexible, because the label is the one part
+                            // of this button that can outgrow it: a 320dp
+                            // phone at a large accessibility text scale
+                            // leaves it about half the width it wants, and
+                            // an unconstrained Row clips the right-hand end
+                            // of the only way into the app.
+                            Flexible(
+                              child: Text(
+                                label,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.button.copyWith(
+                                  // Google's own button uses a near-black
+                                  // label on white, not our ink colour.
+                                  color: enabled
+                                      ? const Color(0xFF3C4043)
+                                      : finance.textDisabled,
+                                ),
                               ),
                             ),
                           ],

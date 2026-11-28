@@ -3,6 +3,7 @@ import 'dart:async';
 import '../domain/auth_repository.dart';
 import '../domain/auth_result.dart';
 import '../domain/auth_user.dart';
+import '../domain/session_restore.dart';
 
 /// Which outcome the next sign-in attempt should produce.
 ///
@@ -28,13 +29,22 @@ enum MockAuthScenario {
 /// screens are built against a flow that genuinely takes time — a mock that
 /// returns instantly hides every race the real one will have.
 ///
-/// ## Why this is the only file that should change in Phase 12
+/// ## What happened when the real provider arrived
 ///
-/// Everything above it depends on [AuthRepository], not on this class. When
-/// the real provider arrives it implements the same interface and the
-/// provider override in `auth_providers.dart` points at it instead. If that
-/// swap turns out to require edits to a screen or a controller, the
-/// abstraction failed and the fix belongs here, not there.
+/// Phase 12 added `GoogleAuthRepository` beside this class and taught
+/// `auth_providers.dart` to choose between them, which is what the interface
+/// was for. The swap cost one method — `restoreSession`, because a real
+/// credential expires and a mock one never did — and no screen changed
+/// behaviour. The copy on three screens did change, but only where it would
+/// otherwise have claimed a Google account that a mock build does not have.
+///
+/// ## Why it is still here
+///
+/// A build with no Google Cloud project behind it has to run: that is every
+/// fresh clone, and every reviewer who wants to see the screens without
+/// provisioning OAuth credentials first. It is also the only way to reach
+/// the cancelled and failed states on demand, which a real provider will not
+/// produce to order.
 class MockAuthRepository implements AuthRepository {
   MockAuthRepository({
     this.scenario = MockAuthScenario.success,
@@ -68,9 +78,18 @@ class MockAuthRepository implements AuthRepository {
     };
   }
 
+  /// Always [SessionRestore.needsUser].
+  ///
+  /// The honest answer: this provider issued no credential, so there is
+  /// nothing to refresh and nothing it could confirm. Deliberately not
+  /// `refreshed`, which would be claiming to have revalidated a session it
+  /// never held in the first place.
+  @override
+  Future<SessionRestore> restoreSession() async => SessionRestore.needsUser;
+
   @override
   Future<void> signOut() async {
-    // Nothing is persisted, so there is nothing to clear. The real
-    // implementation deletes the stored token here.
+    // Nothing is persisted, so there is nothing to clear.
+    // `GoogleAuthRepository` deletes the stored credential here.
   }
 }

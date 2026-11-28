@@ -11,11 +11,11 @@ import '../domain/user_profile.dart';
 ///
 /// ## Why this is not storing a credential
 ///
-/// The mock provider issues no token, so what is kept here is a name, an
-/// email and the answers the user gave during setup. All of it is already
-/// on screen whenever the app is open, and none of it unlocks anything.
-/// When Phase 12 introduces a real token, that goes to
-/// `flutter_secure_storage` and not here — see [KeyValueStore].
+/// What is kept here is a name, an email and the answers the user gave
+/// during setup. All of it is already on screen whenever the app is open,
+/// and none of it unlocks anything. The Google ID token is not here: it
+/// goes to `CredentialVault`, over the keystore, through an interface this
+/// class has no access to.
 ///
 /// ## Why reads are synchronous and writes are not
 ///

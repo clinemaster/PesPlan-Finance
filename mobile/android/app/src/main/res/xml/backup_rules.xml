@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for Android 11 and below.
+
+    Everything the app keeps is included except the secure store. The
+    credential in there is encrypted with a key held in this phone's keystore,
+    and that key cannot leave the phone — so a restored copy on a new device
+    would be an undecryptable blob that only produces errors. The user signs
+    in again instead, which takes one tap, and their transactions, budgets and
+    goals come across as normal.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+</full-backup-content>

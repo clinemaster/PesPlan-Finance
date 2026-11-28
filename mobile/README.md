@@ -14,9 +14,12 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 09 | Voice entry — speak a transaction, review it, confirm it | done |
 | 10 | Assistant — ask about your money, answered from your own figures | done |
 | 11 | Profile, settings and the subscription presentation | done |
+| 12 | Google Sign-In — the real provider, with the credential in the keystore | done |
 
-**There is still no backend, no real authentication and no financial data.** Sign-in is a
-mock that contacts no Google service, and every figure in the showcase is placeholder data.
+**Sign-in is now real, once a build has been given Google credentials.** A build without
+them falls back to the stand-in and says so on the welcome screen — see
+[Google Sign-In setup](../docs/GOOGLE_SIGN_IN_SETUP.md). **There is still no backend and no
+real financial data**: every figure in the app is mock, and nothing reads the credential yet.
 
 ---
 
@@ -25,8 +28,17 @@ mock that contacts no Google service, and every figure in the showcase is placeh
 ```bash
 cd mobile
 flutter pub get
-flutter run            # starts at the welcome screen
+flutter run            # starts at the welcome screen, with the stand-in sign-in
+
+# with real Google Sign-In, once the project has OAuth clients:
+flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<the web client id>
 ```
+
+Without that define there is no Google project behind the build, so sign-in uses the local
+stand-in — which is what every clone gets, and what keeps the app reviewable without
+provisioning credentials first. The welcome screen says which one you have.
+[docs/GOOGLE_SIGN_IN_SETUP.md](../docs/GOOGLE_SIGN_IN_SETUP.md) is the whole path from
+nothing to a working sign-in, including what each failure message means.
 
 `main.dart` launches the real root widget and its router. After onboarding the app settles
 into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. All five are built; there
@@ -41,7 +53,9 @@ opens on.
 Both controls are review affordances and go away with the mock data.
 
 - **Sign-in cancelled / failed** — long-press the brand mark on the welcome screen and pick
-  what the next attempt returns.
+  what the next attempt returns. Only on a stand-in build: a real provider will not fail to
+  order, so the menu is not there. `--dart-define=SIGN_IN_PROVIDER=mock` forces the
+  stand-in on a machine that does have credentials.
 - **The empty dashboard** — Profile & settings → Review controls → *Show the empty
   dashboard*.
 - **The assistant failing** — Profile & settings → Review controls → *Make the assistant
@@ -91,14 +105,17 @@ Widget build(BuildContext context) {
 
 ```
 lib/
-├── main.dart                        ProviderScope + LifePilotApp
+├── main.dart                        ProviderScope, both stores, launch refresh
 ├── app.dart                         MaterialApp.router, theme mode
 ├── core/
 │   ├── router/
 │   │   ├── routes.dart              every route path, as constants
 │   │   └── app_router.dart          go_router + the session guard
+│   ├── config/
+│   │   └── auth_config.dart         which provider this build signs in with
 │   ├── storage/
-│   │   └── key_value_store.dart     persisted state; in-memory by default
+│   │   ├── key_value_store.dart     persisted state; in-memory by default
+│   │   └── credential_store.dart    the keystore; a different door, on purpose
 │   ├── design_system/
 │   │   ├── design_system.dart       the single barrel import
 │   │   ├── tokens/
@@ -127,10 +144,16 @@ lib/
 ├── features/
 │   ├── onboarding/
 │   │   ├── domain/                  AuthUser, AuthResult, AuthRepository,
-│   │   │                            Country, AppLanguage, UserProfile,
-│   │   │                            ProfileValidator — pure Dart, no widgets
+│   │   │                            SessionRestore, Country, AppLanguage,
+│   │   │                            UserProfile, ProfileValidator — pure Dart
 │   │   ├── data/
-│   │   │   └── mock_auth_repository.dart   the ONLY mock; replaced in Phase 12
+│   │   │   ├── google_auth_repository.dart  the real one: SDK outcomes to
+│   │   │   │                                screen states, token to the keystore
+│   │   │   ├── google_sign_in_client.dart   the seam over the plugin singleton
+│   │   │   ├── credential_vault.dart        the ID token, and nothing else
+│   │   │   ├── mock_auth_repository.dart    the stand-in, for builds with no
+│   │   │   │                                Google project behind them
+│   │   │   └── session_store.dart           session and profile in preferences
 │   │   └── presentation/
 │   │       ├── providers/           AuthController, OnboardingController
 │   │       ├── widgets/             brand mark, Google button + painted logo,
@@ -289,7 +312,7 @@ and no ordering of six hues clears the floor. A breakdown with more parts uses
 
 ```bash
 flutter analyze                      # 0 issues
-flutter test                         # 942 tests
+flutter test                         # 1011 tests
 flutter test --update-goldens test/golden   # regenerate the review screenshots
 ```
 
@@ -305,6 +328,11 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/onboarding/onboarding_controller_test.dart` | Both controllers, without a widget tree |
 | `test/onboarding/welcome_screen_test.dart` | Welcome screen and its loading, cancelled and error states |
 | `test/onboarding/onboarding_flow_test.dart` | The whole flow through the real router, including back navigation |
+| `test/auth/auth_config_test.dart` | Which provider a build resolves to, and what reaches the plugin |
+| `test/auth/credential_store_test.dart` | The secure store's contract and the vault over it |
+| `test/auth/google_auth_repository_test.dart` | Every SDK outcome mapped to a screen state, the token written and cleared, and sign-out surviving both halves failing |
+| `test/auth/provider_wiring_test.dart` | That configuration chooses the repository, and the launch refresh |
+| `test/auth/boundary_test.dart` | That the SDK and the keystore stay behind their own files, and the manifest keeps its permission and backup rules |
 
 | `test/dashboard/mock_dashboard_repository_test.dart` | That the mock's figures add up — net, remaining, every ratio |
 | `test/dashboard/greeting_test.dart` | The three time-of-day boundaries |
@@ -365,8 +393,19 @@ review rather than as a cross-platform CI gate.
 - **No localisation yet.** Strings are inline English. Swahili labels are typically longer
   than English, which is why status labels and card rows are built to shrink.
 - **Charts are static.** No tooltips, selection or animation — Phase 02 is visual foundations.
-- **Sign-in is a mock.** `MockAuthRepository` returns a fixed user after a delay. No Google
-  SDK, no network call, no credential, nothing persisted. Phase 12 replaces that one class.
+- **Sign-in is real, and a build without credentials says it is not.** `GoogleAuthRepository`
+  drives the `google_sign_in` plugin, keeps the ID token in the Android keystore and refreshes
+  it at every launch. A build with no `GOOGLE_SERVER_CLIENT_ID` uses `MockAuthRepository`
+  instead — it invents a user, contacts nothing and holds no credential — and the welcome
+  screen, the profile email badge and the security screen each say so rather than implying a
+  Google account that does not exist.
+- **Nothing verifies the token, because nothing should here.** An ID token is a signed claim,
+  and the thing that checks the signature is the backend that will accept it; an app
+  verifying its own credential proves nothing. The app obtains it and keeps it safe. Nothing
+  reads it until there is a server to send it to.
+- **A failed credential refresh never signs anyone out.** The provider cannot tell a revoked
+  account from a phone in a tunnel, so the session restored from storage always stands. The
+  refresh is only ever an improvement.
 - **Language is recorded, not applied.** Choosing Kiswahili stores the preference; the
   interface stays English until localisation lands. The screen says so rather than
   implying otherwise.
@@ -473,6 +512,13 @@ State survives a relaunch, in `shared_preferences` behind `KeyValueStore`:
 | Mock plan | `settings.plan` | Review state only — never an entitlement |
 | Theme | `settings.themeMode` | |
 
+And one thing that is deliberately not in there, in `flutter_secure_storage` behind
+`CredentialStore`:
+
+| What | Where | Notes |
+|---|---|---|
+| Google ID token | `auth.google.idToken` | The Android keystore, not the preferences file. Refreshed at launch, deleted on sign-out, and excluded from Android backup and device transfer |
+
 Three things are worth knowing.
 
 **Controllers restore themselves synchronously inside `build()`.** `main()` opens storage
@@ -486,8 +532,9 @@ recoverable, and losing a plan is recoverable; a crash loop on launch is not.
 
 **No credential is stored here.** `shared_preferences` is an unencrypted file. What is kept
 is a name, an email and the answers from setup — all of it already on screen whenever the app
-is open. The real token Phase 12 introduces belongs in `flutter_secure_storage`, which is why
-`KeyValueStore` has no "secure" flag to make the wrong choice look available.
+is open. The ID token goes to `flutter_secure_storage` instead, through a different interface
+entirely: `KeyValueStore` has no "secure" flag, and `CredentialStore` is not something a
+screen is handed, so nothing in the app can write a credential to preferences by mistake.
 
 A JSON blob rather than `drift`: there is no server yet, so there is nothing to cache and
 nothing to query server-side. A few hundred records is about a hundred kilobytes, and

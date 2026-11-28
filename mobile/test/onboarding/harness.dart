@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lifepilot_finance/app.dart';
+import 'package:lifepilot_finance/core/config/auth_config.dart';
 import 'package:lifepilot_finance/features/onboarding/data/mock_auth_repository.dart';
+import 'package:lifepilot_finance/features/onboarding/domain/auth_repository.dart';
 import 'package:lifepilot_finance/features/onboarding/presentation/providers/auth_providers.dart';
 import 'package:lifepilot_finance/features/onboarding/presentation/providers/onboarding_providers.dart';
 
@@ -23,15 +25,27 @@ class OnboardingHarness {
   /// Zero for tests that only care about the outcome. A real duration for
   /// the loading-state test, which needs a window in which the spinner is
   /// on screen.
+  /// A configuration with a Google client id in it, for the tests that
+  /// check what a real build says. Nothing in a test reaches the plugin:
+  /// [repository] stays the mock, so this only drives the copy that differs
+  /// between a demo build and a configured one.
+  static const AuthConfig googleConfigured = AuthConfig(
+    serverClientId: '000-test.apps.googleusercontent.com',
+  );
+
   static Future<OnboardingHarness> pump(
     WidgetTester tester, {
     MockAuthScenario scenario = MockAuthScenario.success,
     Duration authDelay = Duration.zero,
+    AuthConfig config = const AuthConfig(),
+    AuthRepository? repository,
   }) async {
     final container = ProviderContainer(
       overrides: [
+        authConfigProvider.overrideWithValue(config),
         authRepositoryProvider.overrideWithValue(
-          MockAuthRepository(scenario: scenario, delay: authDelay),
+          repository ??
+              MockAuthRepository(scenario: scenario, delay: authDelay),
         ),
       ],
     );
@@ -52,7 +66,8 @@ class OnboardingHarness {
 
   AuthState get authState => container.read(authControllerProvider);
 
-  OnboardingState get onboarding => container.read(onboardingControllerProvider);
+  OnboardingState get onboarding =>
+      container.read(onboardingControllerProvider);
 
   /// Taps "Continue with Google" and lets the flow settle.
   Future<void> signIn(WidgetTester tester) async {

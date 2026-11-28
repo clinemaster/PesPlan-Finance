@@ -55,10 +55,26 @@ void main() {
       expect(find.text('Your profile'), findsOneWidget);
       expect(find.text('Amina Hassan'), findsWidgets);
 
-      // The email card sits under the editable fields.
-      await SettingsHarness.scrollTo(tester, find.text('From Google'));
+      // The email card sits under the editable fields. On a demo build the
+      // badge says so: the address did not come from Google, because this
+      // build never asked Google anything.
+      await SettingsHarness.scrollTo(tester, find.text('Demo account'));
       expect(find.text('amina.hassan@gmail.com'), findsOneWidget);
+      expect(find.text('Demo account'), findsOneWidget);
+    });
+
+    testWidgets('credits Google for the email on a configured build', (
+      tester,
+    ) async {
+      await SettingsHarness.pump(
+        tester,
+        route: Routes.settingsProfile,
+        config: SettingsHarness.googleConfigured,
+      );
+
+      await SettingsHarness.scrollTo(tester, find.text('From Google'));
       expect(find.text('From Google'), findsOneWidget);
+      expect(find.text('Demo account'), findsNothing);
     });
 
     testWidgets('a new name is saved and shown on the hub', (tester) async {
@@ -359,6 +375,36 @@ void main() {
 
       expect(find.text('Signed in as'), findsOneWidget);
       expect(find.text('No password to remember'), findsOneWidget);
+    });
+
+    testWidgets('a demo build says the sign-in is a stand-in', (tester) async {
+      await SettingsHarness.pump(tester, route: Routes.settingsPrivacy);
+
+      expect(find.textContaining('signs in with a stand-in'), findsOneWidget);
+      expect(find.text('Demo'), findsOneWidget);
+      expect(
+        find.text('Your sign-in is kept in the phone keystore'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('a configured build names Google and the keystore', (
+      tester,
+    ) async {
+      // The one piece of security on this screen that is already real, on a
+      // screen where the app lock below it is not.
+      await SettingsHarness.pump(
+        tester,
+        route: Routes.settingsPrivacy,
+        config: SettingsHarness.googleConfigured,
+      );
+
+      expect(find.text('Google'), findsOneWidget);
+      expect(
+        find.text('Your sign-in is kept in the phone keystore'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('signs in with a stand-in'), findsNothing);
     });
 
     testWidgets('the lock switches are present and inert', (tester) async {

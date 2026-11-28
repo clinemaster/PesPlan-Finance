@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lifepilot_finance/app.dart';
+import 'package:lifepilot_finance/core/config/auth_config.dart';
 import 'package:lifepilot_finance/core/router/app_router.dart';
 import 'package:lifepilot_finance/core/router/routes.dart';
 import 'package:lifepilot_finance/core/storage/key_value_store.dart';
@@ -32,6 +33,13 @@ class SettingsHarness {
   /// The storage behind the preferences, for relaunch tests.
   final KeyValueStore store;
 
+  /// A configuration with a Google client id in it, for the screens whose
+  /// copy differs on a configured build. The repository stays the mock, so
+  /// nothing here touches a platform channel.
+  static const AuthConfig googleConfigured = AuthConfig(
+    serverClientId: '000-test.apps.googleusercontent.com',
+  );
+
   static const Size phone = Size(393, 851);
   static const Size smallPhone = Size(320, 568);
 
@@ -42,6 +50,7 @@ class SettingsHarness {
     String route = Routes.settings,
     KeyValueStore? store,
     Size size = phone,
+    AuthConfig config = const AuthConfig(),
   }) async {
     tester.view
       ..physicalSize = size
@@ -71,6 +80,7 @@ class SettingsHarness {
       overrides: [
         clockProvider.overrideWithValue(() => now),
         keyValueStoreProvider.overrideWithValue(keyValue),
+        authConfigProvider.overrideWithValue(config),
         authRepositoryProvider.overrideWithValue(
           MockAuthRepository(delay: Duration.zero),
         ),

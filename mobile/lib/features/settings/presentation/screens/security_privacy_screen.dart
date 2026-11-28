@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../onboarding/presentation/providers/auth_providers.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../widgets/settings_widgets.dart';
 
@@ -19,6 +20,7 @@ class SecurityPrivacyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final finance = context.finance;
     final profile = ref.watch(onboardingControllerProvider).draft;
+    final config = ref.watch(authConfigProvider);
 
     return Scaffold(
       appBar: AppTopBar(
@@ -37,12 +39,15 @@ class SecurityPrivacyScreen extends ConsumerWidget {
           children: [
             SettingsSection(
               title: 'Signing in',
-              subtitle: 'LifePilot uses your Google account.',
+              subtitle: config.isMock
+                  ? 'LifePilot will use your Google account.'
+                  : 'LifePilot uses your Google account.',
               rows: [
                 SettingsRow(
                   title: 'Signed in as',
                   subtitle: profile?.email ?? 'Not signed in',
                   icon: AppIcons.profile,
+                  value: config.isMock ? 'Demo' : 'Google',
                 ),
                 SettingsRow(
                   title: 'No password to remember',
@@ -51,8 +56,31 @@ class SecurityPrivacyScreen extends ConsumerWidget {
                       'you are, so there is nothing here to lose or reuse.',
                   icon: AppIcons.insurance,
                 ),
+                // Worth a row of its own: it is the one piece of security
+                // in the app that is already real, on a screen where the
+                // app lock above it is not.
+                if (!config.isMock)
+                  SettingsRow(
+                    title: 'Your sign-in is kept in the phone keystore',
+                    subtitle:
+                        'The proof that you signed in is encrypted by '
+                        'Android itself, not stored with your settings. It '
+                        'is deleted the moment you sign out.',
+                    icon: AppIcons.hidden,
+                  ),
               ],
             ),
+            if (config.isMock) ...[
+              const SizedBox(height: AppSpacing.md),
+              const PlaceholderNote(
+                message:
+                    'This build signs in with a stand-in rather than Google: '
+                    'the name and email are invented and no account is '
+                    'contacted. A build with Google credentials compiled '
+                    'into it uses the real thing.',
+                icon: AppIcons.profile,
+              ),
+            ],
             const SizedBox(height: AppSpacing.sectionGap),
 
             SettingsSection(

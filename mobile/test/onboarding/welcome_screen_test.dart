@@ -38,10 +38,7 @@ void main() {
       await tester.tap(find.text('Privacy Policy'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('contacts no Google service'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('contacts no Google service'), findsOneWidget);
     });
 
     testWidgets('shows a spinner while signing in', (tester) async {
@@ -125,6 +122,86 @@ void main() {
       await harness.signIn(tester);
 
       expect(harness.authState, isA<AuthAuthenticated>());
+    });
+  });
+
+  group('saying which provider this is', () {
+    testWidgets('a demo build admits it under the button', (tester) async {
+      // The button carries Google's name and mark. Someone tapping it
+      // reasonably believes they are handing over a Google account, and on
+      // this build they are not.
+      await OnboardingHarness.pump(tester);
+
+      expect(find.textContaining('Demo sign-in'), findsOneWidget);
+    });
+
+    testWidgets('a configured build says nothing of the sort', (tester) async {
+      await OnboardingHarness.pump(
+        tester,
+        config: OnboardingHarness.googleConfigured,
+      );
+
+      expect(find.textContaining('Demo sign-in'), findsNothing);
+      expect(find.text('Continue with Google'), findsOneWidget);
+    });
+
+    testWidgets('the privacy note drops the mock claim once configured', (
+      tester,
+    ) async {
+      // A stale "no Google service is contacted" in a privacy note is the
+      // worst place in the app to leave a sentence that has become untrue.
+      await OnboardingHarness.pump(
+        tester,
+        config: OnboardingHarness.googleConfigured,
+      );
+
+      await tester.tap(find.text('Privacy Policy'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('contacts no Google service'), findsNothing);
+      expect(find.textContaining('asks Google who you are'), findsOneWidget);
+    });
+
+    testWidgets('the review menu exists only while the mock does', (
+      tester,
+    ) async {
+      await OnboardingHarness.pump(tester);
+
+      await tester.longPress(find.byType(BrandMark));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mock sign-in outcome'), findsOneWidget);
+      expect(find.text('Succeed'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Fail'), findsOneWidget);
+    });
+
+    testWidgets('and is gone on a configured build', (tester) async {
+      // There is nothing to choose: the provider decides what happens.
+      await OnboardingHarness.pump(
+        tester,
+        config: OnboardingHarness.googleConfigured,
+      );
+
+      await tester.longPress(find.byType(BrandMark));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mock sign-in outcome'), findsNothing);
+    });
+
+    testWidgets('the demo note fits a small phone', (tester) async {
+      // It is an extra two lines on the tightest screen the app supports,
+      // on a layout held apart by Spacers.
+      tester.view
+        ..physicalSize = const Size(320, 568)
+        ..devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await OnboardingHarness.pump(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Demo sign-in'), findsOneWidget);
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
   });
 }

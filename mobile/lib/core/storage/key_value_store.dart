@@ -7,18 +7,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Two reasons. Tests get an in-memory implementation and never touch a
 /// real platform channel, which keeps them fast and independent of each
-/// other. And when some of this moves — a token to the keychain in Phase
-/// 12, transactions to a database once there is a server to cache — the
-/// move happens behind this interface rather than in every caller.
+/// other. And when some of this moves — transactions to a database once
+/// there is a server to cache — the move happens behind this interface
+/// rather than in every caller.
 ///
 /// ## What must never go in here
 ///
 /// Credentials. `SharedPreferences` is an unencrypted XML file on Android,
-/// readable on a rooted device and in some backups. The mock auth user is
-/// fine — it is a name and an email with no secret attached — but the real
-/// token Phase 12 introduces belongs in `flutter_secure_storage`, which is
-/// what the architecture doc specifies and why this interface deliberately
-/// has no "secure" flag to make the wrong choice look available.
+/// readable on a rooted device and in some backups. The signed-in user is
+/// fine — it is a name and an email with no secret attached — but the
+/// Google ID token goes to `CredentialStore` and the Android keystore
+/// instead. This interface deliberately has no "secure" flag: the two are
+/// different types, so no caller can reach for the wrong one, and a screen
+/// is never handed the one that holds a credential.
 abstract interface class KeyValueStore {
   String? getString(String key);
 

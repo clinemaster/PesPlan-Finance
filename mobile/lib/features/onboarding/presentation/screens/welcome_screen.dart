@@ -24,50 +24,85 @@ class WelcomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
+    final config = ref.watch(authConfigProvider);
     final finance = context.finance;
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
-          child: Column(
-            children: [
-              const Spacer(flex: 2),
-              _Brand(onLongPress: () => _openReviewMenu(context, ref)),
-              const SizedBox(height: AppSpacing.xxl),
-              Text(
-                tagline,
-                textAlign: TextAlign.center,
-                style: AppTypography.titleSection.copyWith(
-                  color: context.colors.primary,
+        // ## Why a screen this short scrolls
+        //
+        // It does not, on any ordinary phone: the spacers absorb the slack
+        // and nothing moves. But this is a fixed column with no room to
+        // give, and on the smallest supported screen at a large text scale
+        // the brand, the promise, the button and the terms the user is being
+        // asked to agree to add up to more than the viewport. Clipping any
+        // of that is unacceptable — one of them is the only way into the app
+        // and another is a legal notice — so the column keeps its proportions
+        // while there is space and becomes scrollable when there is not.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.screenH,
+                  ),
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 2),
+                      // The review menu is a mock affordance, so it
+                      // exists only while the mock does. On a build wired
+                      // to Google there is nothing to choose: the provider
+                      // decides what happens.
+                      _Brand(
+                        onLongPress: config.isMock
+                            ? () => _openReviewMenu(context, ref)
+                            : null,
+                      ),
+                      const SizedBox(height: AppSpacing.xxl),
+                      Text(
+                        tagline,
+                        textAlign: TextAlign.center,
+                        style: AppTypography.titleSection.copyWith(
+                          color: context.colors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        intro,
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyLarge.copyWith(
+                          color: finance.textSecondary,
+                        ),
+                      ),
+                      const Spacer(flex: 3),
+
+                      // The note sits directly above the button that
+                      // produced it, so cause and message are never
+                      // separated by the fold.
+                      _AuthNote(state: authState),
+
+                      GoogleSignInButton(
+                        isLoading: authState is AuthInProgress,
+                        onPressed: authState is AuthInProgress
+                            ? null
+                            : () => ref
+                                  .read(authControllerProvider.notifier)
+                                  .signInWithGoogle(),
+                      ),
+                      if (config.isMock) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        const _DemoProviderNote(),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      _LegalLinks(isMock: config.isMock),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                intro,
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyLarge.copyWith(
-                  color: finance.textSecondary,
-                ),
-              ),
-              const Spacer(flex: 3),
-
-              // The note sits directly above the button that produced it, so
-              // cause and message are never separated by the fold.
-              _AuthNote(state: authState),
-
-              GoogleSignInButton(
-                isLoading: authState is AuthInProgress,
-                onPressed: authState is AuthInProgress
-                    ? null
-                    : () => ref
-                          .read(authControllerProvider.notifier)
-                          .signInWithGoogle(),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              const _LegalLinks(),
-              const SizedBox(height: AppSpacing.sm),
-            ],
+            ),
           ),
         ),
       ),
@@ -82,7 +117,7 @@ class WelcomeScreen extends ConsumerWidget {
   /// by accident, and it adds no control to a screen whose whole point is
   /// having exactly one.
   ///
-  /// It goes away with the mock in Phase 12.
+  /// It is shown only on a build that is actually using the mock.
   Future<void> _openReviewMenu(BuildContext context, WidgetRef ref) async {
     final current = ref.read(mockAuthScenarioProvider);
 
@@ -176,7 +211,7 @@ class _ScenarioOption extends StatelessWidget {
 class _Brand extends StatelessWidget {
   const _Brand({required this.onLongPress});
 
-  final VoidCallback onLongPress;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -261,13 +296,53 @@ class _AuthNote extends StatelessWidget {
   }
 }
 
+/// Says that this build's sign-in is not real.
+///
+/// ## Why this is on the screen and not only in the README
+///
+/// The button above it carries Google's name and mark. Someone tapping it
+/// reasonably believes they are handing over a Google account, and on a mock
+/// build they are not — the app invents a person and signs them in. A
+/// reviewer who does not know that will report that sign-in works, and a
+/// tester will wonder why their own email never appears. It is one sentence,
+/// and it disappears the moment the build has real credentials.
+class _DemoProviderNote extends StatelessWidget {
+  const _DemoProviderNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final finance = context.finance;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(AppIcons.info, size: AppIconSize.sm, color: finance.textTertiary),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(
+          child: Text(
+            'Demo sign-in: no Google account is contacted and the details '
+            'are invented.',
+            style: AppTypography.caption.copyWith(color: finance.textTertiary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Terms and privacy.
 ///
 /// Both open a short in-app note rather than a browser: there is no hosted
 /// policy to link to yet, and a link that opens a 404 is worse than one that
 /// says plainly where the document is in the schedule.
 class _LegalLinks extends StatelessWidget {
-  const _LegalLinks();
+  const _LegalLinks({required this.isMock});
+
+  /// Changes one sentence of the privacy note. The version that says no
+  /// Google service is contacted is true of a mock build and a lie on a real
+  /// one, and a privacy policy is the last place to leave a stale claim.
+  final bool isMock;
 
   @override
   Widget build(BuildContext context) {
@@ -320,10 +395,16 @@ class _LegalLinks extends StatelessWidget {
               onTap: () => AppDialog.info(
                 context,
                 title: 'Privacy Policy',
-                message:
-                    'The full policy will be published before launch. This '
-                    'build signs in with a mock provider, contacts no Google '
-                    'service, and keeps your answers on this device only.',
+                message: isMock
+                    ? 'The full policy will be published before launch. This '
+                          'build signs in with a mock provider, contacts no '
+                          'Google service, and keeps your answers on this '
+                          'device only.'
+                    : 'The full policy will be published before launch. '
+                          'Signing in asks Google who you are; your name and '
+                          'email come back to this phone and stay here. '
+                          'Everything you record — transactions, budgets, '
+                          'goals — is stored on this device only.',
               ),
             ),
           ],

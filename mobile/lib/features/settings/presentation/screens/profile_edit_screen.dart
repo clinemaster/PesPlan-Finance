@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../onboarding/domain/country.dart';
 import '../../../onboarding/domain/profile_validator.dart';
+import '../../../onboarding/presentation/providers/auth_providers.dart';
 import '../../../onboarding/presentation/providers/onboarding_providers.dart';
 import '../widgets/settings_widgets.dart';
 
@@ -73,6 +74,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Widget build(BuildContext context) {
     final finance = context.finance;
     final profile = ref.watch(onboardingControllerProvider).draft;
+    final config = ref.watch(authConfigProvider);
 
     final nameError = _showErrors ? ProfileValidator.name(_name.text) : null;
     final phoneError = _showErrors ? ProfileValidator.phone(_phone.text) : null;
@@ -199,7 +201,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             ],
                           ),
                         ),
-                        AppBadge(label: 'From Google', tone: BadgeTone.neutral),
+                        // Says where the address came from, and does not
+                        // claim Google on a build that never asked it.
+                        AppBadge(
+                          label: config.isMock ? 'Demo account' : 'From Google',
+                          tone: BadgeTone.neutral,
+                        ),
                       ],
                     ),
                   ),
