@@ -12,6 +12,7 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 07 | Budgets — overview, overall and category limits, create, edit, delete | done |
 | 08 | Savings goals — progress, contributions, withdrawals, history | done |
 | 09 | Voice entry — speak a transaction, review it, confirm it | done |
+| 10 | Assistant — ask about your money, answered from your own figures | done |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -27,8 +28,8 @@ flutter run            # starts at the welcome screen
 ```
 
 `main.dart` launches the real root widget and its router. After onboarding the app settles
-into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. Only Assistant is still a
-placeholder, and it says which phase it arrives in.
+into a five-tab shell — Home, Activity, Budgets, Goals, Assistant. All five are built; there
+are no placeholder screens left.
 
 The Phase 02 design system showcase is still available at `/showcase`, reachable from
 Profile & settings, so the visual language stays reviewable without being what the app
@@ -42,6 +43,8 @@ Both controls are review affordances and go away with the mock data.
   what the next attempt returns.
 - **The empty dashboard** — Profile & settings → Review controls → *Show the empty
   dashboard*.
+- **The assistant failing** — Profile & settings → Review controls → *Make the assistant
+  fail*. The next question comes back as an error with a retry beside it.
 - **The voice states** — press the microphone repeatedly. The mock cycles: a clear expense,
   a clear income, an extraction missing its amount, then a failure. A build where only the
   happy path can be reached is a build whose error state nobody has looked at.
@@ -203,9 +206,22 @@ lib/
 │   │       ├── widgets/             mic button, language picker,
 │   │       │                        examples, transcript, extracted rows
 │   │       └── screens/voice_entry_screen.dart
+│   ├── assistant/
+│   │   ├── domain/                  ChatMessage, Conversation,
+│   │   │                            AssistantInsight, AssistantUsage,
+│   │   │                            SuggestionGroup
+│   │   ├── data/
+│   │   │   ├── financial_snapshot.dart   what the assistant may see,
+│   │   │   │                        gathered from the other repositories
+│   │   │   ├── mock_assistant_repository.dart   reads the question,
+│   │   │   │                        answers from those figures
+│   │   │   └── conversation_store.dart   the words, not the cards
+│   │   └── presentation/
+│   │       ├── providers/           conversations, usage, failure switch
+│   │       ├── widgets/             bubble, insight card, typing, chips
+│   │       └── screens/             assistant, conversation history
 │   ├── shell/presentation/          the five-tab frame
-│   ├── settings/presentation/       profile, theme, review controls
-│   └── placeholders/presentation/   honest "not built yet" screen
+│   └── settings/presentation/       profile, theme, review controls
 └── showcase/                        internal review screen, route /showcase
 ```
 
@@ -261,7 +277,7 @@ and no ordering of six hues clears the floor. A breakdown with more parts uses
 
 ```bash
 flutter analyze                      # 0 issues
-flutter test                         # 833 tests
+flutter test                         # 889 tests
 flutter test --update-goldens test/golden   # regenerate the review screenshots
 ```
 
@@ -302,6 +318,8 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/savings/goal_movements_test.dart` | Contributions, withdrawals, withdrawal limits, history, and that neither touches transactions |
 | `test/voice/transcript_reader_test.dart` | Kiswahili and English number words, verbs, category words, dates, and what is left unknown |
 | `test/voice/voice_flow_test.dart` | Every stage from the microphone to the saved transaction, both entry points, uncertainty, and the manual fallback |
+| `test/assistant/mock_assistant_repository_test.dart` | That every answer quotes the same figures the other screens show, what it refuses to guess, the allowance, and the insight cards |
+| `test/assistant/assistant_screen_test.dart` | The welcome, suggestions, asking, the typing state, failure and retry, conversation history, delete, and a relaunch |
 | `test/persistence/persistence_test.dart` | Session, profile, transactions and preferences across a relaunch; unreadable stored state |
 | `test/persistence/relaunch_test.dart` | The whole app restarted over the same storage |
 
@@ -344,9 +362,15 @@ review rather than as a cross-platform CI gate.
   out as literals rather than computed, because that layer is what computes them, and
   putting the arithmetic in Dart would be the start of the duplicate finance engine the
   architecture exists to prevent.
-- **One of the five tabs is a placeholder.** Assistant says which phase it arrives in and
-  shows no figures, so a placeholder is never mistaken for a finished screen in a
-  screenshot.
+- **The assistant is a keyword matcher, not a model.** No AI provider, no API key, no
+  network call, nothing sent anywhere. It reads the question for what it is about, fetches
+  the matching numbers from the repositories that own them, and writes a sentence around
+  them — so every figure it states is one the user can go and check on Reports, Budgets or
+  Goals. Phase 18 replaces that one class.
+- **It says what it cannot do.** No investment or tax advice, no projected dates, and no
+  answer at all where there is no data: "you have not set an overall budget" rather than a
+  budget answer of zero. The daily allowance on screen is a mock — nothing is billed,
+  enforced or expired.
 - **An empty state's action can say what it does.** `EmptyState` always put a plus on its
   button, which reads wrong on "Try again"; it now takes an `actionIcon`, defaulting to the
   plus that suits the common case.
@@ -418,6 +442,7 @@ State survives a relaunch, in `shared_preferences` behind `KeyValueStore`:
 | Budgets | `budgets.all` | Same arrangement; written even when empty, so deleting the last budget is not undone by the seed |
 | Savings goals | `savings.goals` | Plans only — no balance is stored |
 | Goal movements | `savings.movements` | Every contribution and withdrawal; the balances are derived from these |
+| Conversations | `assistant.conversations` | The words only — insight cards are rebuilt from today's figures, never restored stale |
 | Theme | `settings.themeMode` | |
 
 Three things are worth knowing.

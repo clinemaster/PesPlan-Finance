@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../app.dart';
 import '../../../core/design_system/design_system.dart';
 import '../../../core/router/routes.dart';
+import '../../assistant/presentation/providers/assistant_providers.dart';
 import '../../dashboard/data/mock_dashboard_repository.dart';
 import '../../dashboard/presentation/providers/dashboard_providers.dart';
 import '../../onboarding/presentation/providers/auth_providers.dart';
@@ -121,6 +122,19 @@ class SettingsScreen extends ConsumerWidget {
                                 ? MockDataMode.empty
                                 : MockDataMode.populated,
                           ),
+                    ),
+                  ),
+                  const AppDivider(),
+                  _SettingRow(
+                    title: 'Make the assistant fail',
+                    subtitle:
+                        'The next question comes back as an error, so the '
+                        'retry path can be seen.',
+                    trailing: Switch.adaptive(
+                      value: ref.watch(assistantShouldFailProvider),
+                      onChanged: (shouldFail) => ref
+                          .read(assistantShouldFailProvider.notifier)
+                          .set(shouldFail: shouldFail),
                     ),
                   ),
                   const AppDivider(),

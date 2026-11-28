@@ -48,6 +48,11 @@ void main() {
     // 45,000, and working that out is arithmetic. Stands in for the
     // extraction service; replaced in Phase 17.
     'transcript_reader.dart': 'reads amounts out of speech while it is mocked',
+    // Works out shares, differences and what is left over so the
+    // assistant can say them in a sentence. Stands in for the assistant
+    // service; replaced in Phase 18.
+    'mock_assistant_repository.dart':
+        'answers questions about amounts while it is mocked',
     // Charts turn a value into a pixel, which the heuristic exempts.
     'charts.dart': 'lays out chart marks',
   };

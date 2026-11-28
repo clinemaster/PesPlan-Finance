@@ -122,7 +122,9 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Profile and settings'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(Switch));
+      // The first switch in Review controls: there are two now that the
+      // assistant has a failure control of its own.
+      await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -140,10 +142,12 @@ void main() {
 
       await tester.tap(
         find.descendant(
-          of: find.ancestor(
-            of: find.text('Recent activity'),
-            matching: find.byType(Row),
-          ).first,
+          of: find
+              .ancestor(
+                of: find.text('Recent activity'),
+                matching: find.byType(Row),
+              )
+              .first,
           matching: find.text('View all'),
         ),
       );

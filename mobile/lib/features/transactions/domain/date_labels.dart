@@ -90,6 +90,25 @@ abstract final class DateLabels {
     return '${short(from!)} – ${short(to!)}';
   }
 
+  /// A clock time, with the day when it was not today: "14:32",
+  /// "Yesterday 14:32", "23 Nov 14:32".
+  ///
+  /// For anything that arrives in sequence — chat messages — where the
+  /// hour matters and the date usually does not.
+  static String timeLabel(DateTime moment, DateTime today) {
+    final clock =
+        '${moment.hour.toString().padLeft(2, '0')}:'
+        '${moment.minute.toString().padLeft(2, '0')}';
+
+    final day = dayOf(moment);
+    final now = dayOf(today);
+    if (day == now) return clock;
+    if (day == now.subtract(const Duration(days: 1))) {
+      return 'Yesterday $clock';
+    }
+    return '${short(moment)} $clock';
+  }
+
   static String short(DateTime date) =>
       '${date.day} ${_shortMonths[date.month - 1]}';
 }

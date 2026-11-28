@@ -37,8 +37,12 @@ abstract final class Routes {
   /// Tab 4 — savings goals.
   static const String goals = '/goals';
 
-  /// Tab 5 — the assistant. Placeholder until its phase.
+  /// Tab 5 — the assistant.
   static const String assistant = '/assistant';
+
+  /// Everything asked before. Full screen over the shell: a list of
+  /// conversations wants the width to say what each one was about.
+  static const String assistantHistory = '/assistant/history';
 
   // ------------------------------------------------- pushed over the shell
   //

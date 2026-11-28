@@ -6,6 +6,8 @@ import '../../features/budgets/domain/budget.dart';
 import '../../features/budgets/presentation/screens/budget_edit_screen.dart';
 import '../../features/budgets/presentation/screens/budget_form_screen.dart';
 import '../../features/budgets/presentation/screens/budgets_screen.dart';
+import '../../features/assistant/presentation/screens/assistant_screen.dart';
+import '../../features/assistant/presentation/screens/conversation_history_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/savings/domain/goal_movement.dart';
 import '../../features/savings/presentation/screens/goal_detail_screen.dart';
@@ -21,7 +23,6 @@ import '../../features/onboarding/presentation/screens/completion_screen.dart';
 import '../../features/onboarding/presentation/screens/preferences_setup_screen.dart';
 import '../../features/onboarding/presentation/screens/profile_setup_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
-import '../../features/placeholders/presentation/placeholder_screen.dart';
 import '../../features/reports/presentation/screens/annual_report_screen.dart';
 import '../../features/reports/presentation/screens/reports_screen.dart';
 import '../../features/reports/presentation/screens/year_comparison_screen.dart';
@@ -32,7 +33,6 @@ import '../../features/transactions/presentation/screens/transaction_form_screen
 import '../../features/transactions/presentation/screens/transactions_screen.dart';
 import '../../features/shell/presentation/main_shell.dart';
 import '../../showcase/design_system_showcase.dart';
-import '../design_system/tokens/app_icons.dart';
 import 'routes.dart';
 
 /// The app's router, with the session guard that decides which section a
@@ -159,13 +159,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.assistant,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Assistant',
-                  icon: AppIcons.assistant,
-                  message:
-                      'Ask about your spending in plain language. Coming in '
-                      'a later phase.',
-                ),
+                builder: (context, state) => const AssistantScreen(),
               ),
             ],
           ),
@@ -248,6 +242,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.goalDetailPattern,
         builder: (context, state) =>
             GoalDetailScreen(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: Routes.assistantHistory,
+        builder: (context, state) => const ConversationHistoryScreen(),
       ),
       GoRoute(
         path: Routes.reports,
