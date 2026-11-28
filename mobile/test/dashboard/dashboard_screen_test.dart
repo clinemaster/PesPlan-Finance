@@ -245,7 +245,7 @@ void main() {
     for (final (label, destination) in [
       ('Add expense', 'New transaction'),
       ('Add income', 'New transaction'),
-      ('By voice', 'Record by voice'),
+      ('By voice', 'Say it'),
     ]) {
       testWidgets('$label opens its screen and comes back', (tester) async {
         await DashboardHarness.pump(tester);
@@ -281,15 +281,19 @@ void main() {
       expect(find.text('How much went out'), findsOneWidget);
     });
 
-    testWidgets('the voice action still promises nothing is saved', (
+    testWidgets('the voice action opens the voice screen, ready', (
       tester,
     ) async {
+      // The placeholder this replaced promised no microphone is used.
+      // That is still true, and now it is the screen's own behaviour
+      // rather than a sentence on a stub.
       await DashboardHarness.pump(tester);
 
       await tester.tap(find.text('By voice'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('No microphone is used'), findsOneWidget);
+      expect(find.text('What did you spend or earn?'), findsOneWidget);
+      expect(find.text('Tap to start'), findsOneWidget);
     });
   });
 

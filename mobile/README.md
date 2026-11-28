@@ -11,6 +11,7 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 06 | Reports — periods, breakdown, annual, year comparison | done |
 | 07 | Budgets — overview, overall and category limits, create, edit, delete | done |
 | 08 | Savings goals — progress, contributions, withdrawals, history | done |
+| 09 | Voice entry — speak a transaction, review it, confirm it | done |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -41,6 +42,9 @@ Both controls are review affordances and go away with the mock data.
   what the next attempt returns.
 - **The empty dashboard** — Profile & settings → Review controls → *Show the empty
   dashboard*.
+- **The voice states** — press the microphone repeatedly. The mock cycles: a clear expense,
+  a clear income, an extraction missing its amount, then a failure. A build where only the
+  happy path can be reached is a build whose error state nobody has looked at.
 
 ---
 
@@ -185,6 +189,20 @@ lib/
 │   │       │                        icon picker
 │   │       └── screens/             goals, goal detail, add/edit form,
 │   │                                edit loader, contribute/withdraw
+│   ├── voice/
+│   │   ├── domain/                  VoiceLanguage, VoiceTranscript,
+│   │   │                            VoiceExtraction, VoiceField,
+│   │   │                            VoiceSession and its stages
+│   │   ├── data/
+│   │   │   ├── transcript_reader.dart   reads amounts, categories, dates
+│   │   │   │                        and direction out of a sentence
+│   │   │   └── mock_voice_repository.dart   stands in for a speech
+│   │   │                            service; opens no microphone
+│   │   └── presentation/
+│   │       ├── providers/           the session, start to finish
+│   │       ├── widgets/             mic button, language picker,
+│   │       │                        examples, transcript, extracted rows
+│   │       └── screens/voice_entry_screen.dart
 │   ├── shell/presentation/          the five-tab frame
 │   ├── settings/presentation/       profile, theme, review controls
 │   └── placeholders/presentation/   honest "not built yet" screen
@@ -243,7 +261,7 @@ and no ordering of six hues clears the floor. A breakdown with more parts uses
 
 ```bash
 flutter analyze                      # 0 issues
-flutter test                         # 743 tests
+flutter test                         # 833 tests
 flutter test --update-goldens test/golden   # regenerate the review screenshots
 ```
 
@@ -282,6 +300,8 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/savings/goals_screen_test.dart` | The total, goal cards, ordering, the completed section, the empty state, dashboard entry points, two phone sizes |
 | `test/savings/goal_crud_test.dart` | Create, edit, delete with confirmation, every validation rule, and the completion warning |
 | `test/savings/goal_movements_test.dart` | Contributions, withdrawals, withdrawal limits, history, and that neither touches transactions |
+| `test/voice/transcript_reader_test.dart` | Kiswahili and English number words, verbs, category words, dates, and what is left unknown |
+| `test/voice/voice_flow_test.dart` | Every stage from the microphone to the saved transaction, both entry points, uncertainty, and the manual fallback |
 | `test/persistence/persistence_test.dart` | Session, profile, transactions and preferences across a relaunch; unreadable stored state |
 | `test/persistence/relaunch_test.dart` | The whole app restarted over the same storage |
 
@@ -327,6 +347,19 @@ review rather than as a cross-platform CI gate.
 - **One of the five tabs is a placeholder.** Assistant says which phase it arrives in and
   shows no figures, so a placeholder is never mistaken for a finished screen in a
   screenshot.
+- **An empty state's action can say what it does.** `EmptyState` always put a plus on its
+  button, which reads wrong on "Try again"; it now takes an `actionIcon`, defaulting to the
+  plus that suits the common case.
+- **Voice opens no microphone.** There is no audio, no permission request, no speech
+  recognition and no model. The screen runs the real flow — listening, understanding,
+  transcript, review — against a mock that answers from a list, and the timer is the only
+  thing actually running. What is *not* pretend is the reader: the transcript the user
+  corrects is really parsed, so changing "elfu kumi" to "elfu ishirini" really does change
+  the amount. Phase 17 replaces the mock service; the reader goes with it.
+- **Nothing spoken is saved without a confirmation.** The extraction is presented as a
+  suggestion, every field can be changed, and an amount that was not heard is asked for
+  rather than guessed — a voice feature that files money on its own is one people stop
+  trusting the first time it mishears.
 - **Quick actions save nothing.** Add expense, add income and record-by-voice open screens
   that say so. No microphone is touched.
 - **The greeting does not re-render as time passes.** It is computed per build from an

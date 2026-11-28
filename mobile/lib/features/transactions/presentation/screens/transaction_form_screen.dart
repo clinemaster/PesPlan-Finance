@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/router/routes.dart';
 import '../../../../core/time/clock.dart';
 import '../../domain/date_labels.dart';
 import '../../domain/transaction.dart';
 import '../../domain/transaction_category.dart';
+import '../../domain/transaction_draft.dart';
 import '../../domain/transaction_validator.dart';
 import '../providers/transaction_providers.dart';
 import '../widgets/category_picker.dart';
@@ -23,7 +25,12 @@ import '../widgets/category_picker.dart';
 /// and focused on arrival. Everything beneath it either has a sensible
 /// default (today) or is one tap (category).
 class TransactionFormScreen extends ConsumerStatefulWidget {
-  const TransactionFormScreen({super.key, this.existing, this.initialType});
+  const TransactionFormScreen({
+    super.key,
+    this.existing,
+    this.initialType,
+    this.draft,
+  });
 
   /// The transaction being edited, or null when adding a new one.
   final Transaction? existing;
@@ -32,13 +39,18 @@ class TransactionFormScreen extends ConsumerStatefulWidget {
   /// use it so "Add income" does not land on an expense form.
   final TransactionType? initialType;
 
+  /// What is known so far, from somewhere that is not this form — voice
+  /// today. Fills the fields in and still saves as a new transaction: a
+  /// draft is not an edit, and treating it as one would mean looking for
+  /// a record that does not exist.
+  final TransactionDraft? draft;
+
   @override
   ConsumerState<TransactionFormScreen> createState() =>
       _TransactionFormScreenState();
 }
 
-class _TransactionFormScreenState
-    extends ConsumerState<TransactionFormScreen> {
+class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
   late final TextEditingController _amountController;
   late final TextEditingController _descriptionController;
 
@@ -57,20 +69,26 @@ class _TransactionFormScreenState
   void initState() {
     super.initState();
     final existing = widget.existing;
+    final draft = widget.draft;
 
-    _type = existing?.type ?? widget.initialType ?? TransactionType.expense;
-    _categoryId = existing?.categoryId;
-    _categoryLabel = existing?.categoryLabel;
-    _date = existing?.date ?? ref.read(clockProvider)();
+    _type =
+        existing?.type ??
+        draft?.type ??
+        widget.initialType ??
+        TransactionType.expense;
+    _categoryId = existing?.categoryId ?? draft?.categoryId;
+    _categoryLabel = existing?.categoryLabel ?? draft?.categoryLabel;
+    _date = existing?.date ?? draft?.date ?? ref.read(clockProvider)();
 
     // Seeded as a magnitude: the form asks "how much", and the sign is the
     // type selector's job.
-    _minorUnits = existing?.amount.minorUnits.abs();
+    _minorUnits =
+        existing?.amount.minorUnits.abs() ?? draft?.magnitudeMinorUnits;
     _amountController = TextEditingController(
-      text: existing == null ? '' : _minorUnits.toString(),
+      text: _minorUnits == null ? '' : _minorUnits.toString(),
     );
     _descriptionController = TextEditingController(
-      text: existing?.description ?? '',
+      text: existing?.description ?? draft?.description ?? '',
     );
   }
 
@@ -246,6 +264,18 @@ class _TransactionFormScreenState
                     },
                   ),
                   const SizedBox(height: AppSpacing.lg),
+
+                  // Offered on the way in, not forced: someone who opened
+                  // the form knows how to type, and the people who want
+                  // to speak are the ones who will take this.
+                  if (!_isEditing)
+                    AppButton.text(
+                      label: 'Say it instead',
+                      icon: AppIcons.voice,
+                      isFullWidth: true,
+                      onPressed: () => context.pushReplacement(Routes.addVoice),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
 
                   Text(
                     'Saved on this device only. Nothing is sent anywhere '

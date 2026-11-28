@@ -28,6 +28,7 @@ class EmptyState extends StatelessWidget {
     this.icon = AppIcons.transactions,
     this.actionLabel,
     this.onAction,
+    this.actionIcon = AppIcons.add,
   });
 
   final String title;
@@ -35,6 +36,11 @@ class EmptyState extends StatelessWidget {
   final IconData icon;
   final String? actionLabel;
   final VoidCallback? onAction;
+
+  /// The icon on the action. Adding something is the common case and
+  /// stays the default, but "Try again" with a plus on it says the
+  /// wrong thing.
+  final IconData actionIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +87,7 @@ class EmptyState extends StatelessWidget {
               label: actionLabel!,
               onPressed: onAction,
               isFullWidth: false,
-              icon: AppIcons.add,
+              icon: actionIcon,
             ),
           ],
         ],

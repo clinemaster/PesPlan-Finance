@@ -13,6 +13,8 @@ import '../../features/savings/presentation/screens/goal_edit_screen.dart';
 import '../../features/savings/presentation/screens/goal_form_screen.dart';
 import '../../features/savings/presentation/screens/goal_movement_screen.dart';
 import '../../features/savings/presentation/screens/goals_screen.dart';
+import '../../features/transactions/domain/transaction_draft.dart';
+import '../../features/voice/presentation/screens/voice_entry_screen.dart';
 import '../../features/onboarding/presentation/providers/auth_providers.dart';
 import '../../features/onboarding/presentation/providers/onboarding_providers.dart';
 import '../../features/onboarding/presentation/screens/completion_screen.dart';
@@ -186,6 +188,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             'expense' => TransactionType.expense,
             _ => null,
           },
+          // Set when the voice screen hands over what it understood. It
+          // travels as `extra` rather than in the path: a draft is a
+          // handful of fields, and a URL carrying an amount and a
+          // category is one a user could bookmark into a half-filled
+          // form.
+          draft: state.extra is TransactionDraft
+              ? state.extra! as TransactionDraft
+              : null,
         ),
       ),
       GoRoute(
@@ -253,14 +263,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.addVoice,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Record by voice',
-          icon: AppIcons.voice,
-          showBack: true,
-          message:
-              'Say "two thousand for a bajaji" and have it filed correctly. '
-              'No microphone is used in this phase.',
-        ),
+        builder: (context, state) => const VoiceEntryScreen(),
       ),
 
       GoRoute(

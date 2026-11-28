@@ -44,6 +44,10 @@ void main() {
     // server; replaced in Phase 16 along with its arithmetic.
     'mock_savings_repository.dart':
         'measures savings goals while the data is mocked',
+    // Reads amounts out of spoken sentences — "elfu arobaini na tano" is
+    // 45,000, and working that out is arithmetic. Stands in for the
+    // extraction service; replaced in Phase 17.
+    'transcript_reader.dart': 'reads amounts out of speech while it is mocked',
     // Charts turn a value into a pixel, which the heuristic exempts.
     'charts.dart': 'lays out chart marks',
   };

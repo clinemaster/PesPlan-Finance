@@ -110,7 +110,11 @@ abstract final class Routes {
   static const String reportsAnnual = '/reports/annual';
   static const String reportsCompare = '/reports/compare';
 
-  /// Speaking an amount instead of typing it. Still a placeholder.
+  /// Speaking a transaction instead of typing it.
+  ///
+  /// No microphone is opened in this phase: the screen runs the flow
+  /// against a mock speech service, and the transaction it produces is
+  /// still confirmed by the user on the way out.
   static const String addVoice = '/add/voice';
 
   /// The Phase 02 design system showcase.
