@@ -53,6 +53,16 @@ abstract final class Routes {
   /// Profile and settings, reached from the dashboard header.
   static const String settings = '/settings';
 
+  /// The settings hub's own screens. Each is pushed over the hub rather
+  /// than nested inside it: a settings screen that scrolls for a minute
+  /// is one nobody finds anything in.
+  static const String settingsProfile = '/settings/profile';
+  static const String settingsPreferences = '/settings/preferences';
+  static const String settingsNotifications = '/settings/notifications';
+  static const String settingsPrivacy = '/settings/privacy';
+  static const String settingsSubscription = '/settings/subscription';
+  static const String settingsHelp = '/settings/help';
+
   /// Recording a transaction. Full screen, over the shell: the form wants
   /// the whole display and a keyboard, and a bottom bar underneath it is
   /// just somewhere to lose a tap.

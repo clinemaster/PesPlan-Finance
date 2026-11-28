@@ -26,6 +26,12 @@ import '../../features/onboarding/presentation/screens/welcome_screen.dart';
 import '../../features/reports/presentation/screens/annual_report_screen.dart';
 import '../../features/reports/presentation/screens/reports_screen.dart';
 import '../../features/reports/presentation/screens/year_comparison_screen.dart';
+import '../../features/settings/presentation/screens/help_screen.dart';
+import '../../features/settings/presentation/screens/notifications_screen.dart';
+import '../../features/settings/presentation/screens/preferences_screen.dart';
+import '../../features/settings/presentation/screens/profile_edit_screen.dart';
+import '../../features/settings/presentation/screens/security_privacy_screen.dart';
+import '../../features/settings/presentation/screens/subscription_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/transactions/domain/transaction.dart';
 import '../../features/transactions/presentation/screens/transaction_edit_screen.dart';
@@ -170,6 +176,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.settingsProfile,
+        builder: (context, state) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        path: Routes.settingsPreferences,
+        builder: (context, state) => const PreferencesScreen(),
+      ),
+      GoRoute(
+        path: Routes.settingsNotifications,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: Routes.settingsPrivacy,
+        builder: (context, state) => const SecurityPrivacyScreen(),
+      ),
+      GoRoute(
+        path: Routes.settingsSubscription,
+        builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: Routes.settingsHelp,
+        builder: (context, state) => const HelpScreen(),
       ),
       // Over the shell, not inside the Activity branch: a form wants the
       // whole screen and a keyboard, and the bottom bar under it is only

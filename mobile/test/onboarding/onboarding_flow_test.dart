@@ -31,7 +31,10 @@ void main() {
       final harness = await OnboardingHarness.pump(tester);
       await harness.signIn(tester);
 
-      expect(find.text(MockAuthRepository.demoUser.displayName), findsOneWidget);
+      expect(
+        find.text(MockAuthRepository.demoUser.displayName),
+        findsOneWidget,
+      );
       expect(find.text(MockAuthRepository.demoUser.email), findsOneWidget);
     });
 
@@ -120,10 +123,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Your preferences'), findsOneWidget);
-      expect(
-        harness.onboarding.draft!.phone,
-        '+255 712 345 678',
-      );
+      expect(harness.onboarding.draft!.phone, '+255 712 345 678');
     });
 
     testWidgets('the phone can be skipped entirely', (tester) async {
@@ -326,19 +326,18 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Profile and settings'));
       await tester.pumpAndSettle();
 
-      final signOut = find.widgetWithText(AppButton, 'Sign out');
-      await tester.scrollUntilVisible(
-        signOut,
-        200,
-        scrollable: find.byType(Scrollable).first,
+      // Sign out is a row in the Account section at the end of the hub.
+      await tester.dragUntilVisible(
+        find.text('Sign out'),
+        find.byType(ListView).last,
+        const Offset(0, -220),
       );
       await tester.pumpAndSettle();
-      await tester.tap(signOut);
+      await tester.tap(find.text('Sign out').first);
       await tester.pumpAndSettle();
 
-      // Confirm in the dialog, which is the later of the two buttons now
-      // carrying that label.
-      await tester.tap(signOut.last);
+      // Confirm in the dialog.
+      await tester.tap(find.widgetWithText(AppButton, 'Sign out').last);
       await tester.pumpAndSettle();
 
       expect(find.text('Continue with Google'), findsOneWidget);

@@ -13,6 +13,7 @@ The Flutter client for LifePilot Finance. Built in phases:
 | 08 | Savings goals — progress, contributions, withdrawals, history | done |
 | 09 | Voice entry — speak a transaction, review it, confirm it | done |
 | 10 | Assistant — ask about your money, answered from your own figures | done |
+| 11 | Profile, settings and the subscription presentation | done |
 
 **There is still no backend, no real authentication and no financial data.** Sign-in is a
 mock that contacts no Google service, and every figure in the showcase is placeholder data.
@@ -221,7 +222,18 @@ lib/
 │   │       ├── widgets/             bubble, insight card, typing, chips
 │   │       └── screens/             assistant, conversation history
 │   ├── shell/presentation/          the five-tab frame
-│   └── settings/presentation/       profile, theme, review controls
+│   └── settings/
+│       ├── domain/                  NotificationChannel, AppTimezone,
+│       │                            Plan, PlanFeature, Subscription
+│       ├── data/settings_store.dart what the user chose, kept
+│       └── presentation/
+│           ├── providers/           notifications, timezone, plan
+│           ├── widgets/             rows, sections, plan card,
+│           │                        comparison, placeholder note
+│           ├── settings_screen.dart the hub
+│           └── screens/             profile, preferences, notifications,
+│                                    security & privacy, subscription,
+│                                    help
 └── showcase/                        internal review screen, route /showcase
 ```
 
@@ -277,7 +289,7 @@ and no ordering of six hues clears the floor. A breakdown with more parts uses
 
 ```bash
 flutter analyze                      # 0 issues
-flutter test                         # 889 tests
+flutter test                         # 942 tests
 flutter test --update-goldens test/golden   # regenerate the review screenshots
 ```
 
@@ -320,6 +332,7 @@ flutter test --update-goldens test/golden   # regenerate the review screenshots
 | `test/voice/voice_flow_test.dart` | Every stage from the microphone to the saved transaction, both entry points, uncertainty, and the manual fallback |
 | `test/assistant/mock_assistant_repository_test.dart` | That every answer quotes the same figures the other screens show, what it refuses to guess, the allowance, and the insight cards |
 | `test/assistant/assistant_screen_test.dart` | The welcome, suggestions, asking, the typing state, failure and retry, conversation history, delete, and a relaunch |
+| `test/settings/settings_test.dart` | The hub, profile editing and its validation, every preference, notification switches and their persistence, the security and privacy placeholders, the plan comparison and mock upgrade, help, and sign-out |
 | `test/persistence/persistence_test.dart` | Session, profile, transactions and preferences across a relaunch; unreadable stored state |
 | `test/persistence/relaunch_test.dart` | The whole app restarted over the same storage |
 
@@ -362,6 +375,18 @@ review rather than as a cross-platform CI gate.
   out as literals rather than computed, because that layer is what computes them, and
   putting the arithmetic in Dart would be the start of the duplicate finance engine the
   architecture exists to prevent.
+- **The subscription is a presentation, not a product.** No price, no store, no receipt, no
+  entitlement check: "Try Premium" sets a flag on the device so the Premium screens can be
+  reviewed, and says so before and after. Nothing in the app reads the plan to decide what a
+  user may do, and the feature table is a proposal to argue with rather than a commitment.
+- **Several settings are deliberately inert, and say so.** App lock and biometrics are
+  switched off and cannot be turned on; export, account deletion, the help centre, support,
+  feedback and the legal documents each open a sheet explaining what they will do and that
+  they do not do it yet. Confirming account deletion deletes nothing — faking it would leave
+  someone's data here while telling them it had gone.
+- **Choosing Kiswahili saves the choice and changes nothing else.** The interface is English
+  until localisation lands, and the preference screen says that rather than letting the user
+  discover it.
 - **The assistant is a keyword matcher, not a model.** No AI provider, no API key, no
   network call, nothing sent anywhere. It reads the question for what it is about, fetches
   the matching numbers from the repositories that own them, and writes a sentence around
@@ -443,6 +468,9 @@ State survives a relaunch, in `shared_preferences` behind `KeyValueStore`:
 | Savings goals | `savings.goals` | Plans only — no balance is stored |
 | Goal movements | `savings.movements` | Every contribution and withdrawal; the balances are derived from these |
 | Conversations | `assistant.conversations` | The words only — insight cards are rebuilt from today's figures, never restored stale |
+| Notification choices | `settings.notifications` | Which channels are on |
+| Timezone | `settings.timezone` | An IANA id, ready for a server that schedules |
+| Mock plan | `settings.plan` | Review state only — never an entitlement |
 | Theme | `settings.themeMode` | |
 
 Three things are worth knowing.

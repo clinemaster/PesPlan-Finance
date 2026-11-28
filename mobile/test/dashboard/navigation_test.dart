@@ -122,8 +122,15 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Profile and settings'));
       await tester.pumpAndSettle();
-      // The first switch in Review controls: there are two now that the
-      // assistant has a failure control of its own.
+      // Review controls sit near the bottom of the hub now, and the
+      // first switch there is the one this test wants — the assistant
+      // has a failure control of its own below it.
+      await tester.scrollUntilVisible(
+        find.text('Show the empty dashboard'),
+        240,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(Switch).first);
       await tester.pumpAndSettle();
       await tester.pageBack();

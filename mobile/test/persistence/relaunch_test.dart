@@ -248,16 +248,17 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Profile and settings'));
     await tester.pumpAndSettle();
-    final signOut = find.widgetWithText(AppButton, 'Sign out');
+    // Sign out is a row in the Account section now, not a button at the
+    // end of the screen.
     await tester.scrollUntilVisible(
-      signOut,
-      200,
-      scrollable: find.byType(Scrollable).first,
+      find.text('Sign out'),
+      240,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.pumpAndSettle();
-    await tester.tap(signOut);
+    await tester.tap(find.text('Sign out').first);
     await tester.pumpAndSettle();
-    await tester.tap(signOut.last);
+    await tester.tap(find.widgetWithText(AppButton, 'Sign out').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Continue with Google'), findsOneWidget);

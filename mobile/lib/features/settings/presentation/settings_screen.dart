@@ -10,89 +10,191 @@ import '../../dashboard/data/mock_dashboard_repository.dart';
 import '../../dashboard/presentation/providers/dashboard_providers.dart';
 import '../../onboarding/presentation/providers/auth_providers.dart';
 import '../../onboarding/presentation/providers/onboarding_providers.dart';
+import 'providers/settings_providers.dart';
+import 'widgets/settings_widgets.dart';
 
-/// Profile, appearance, and the controls a reviewer needs.
+/// Everything about the account, in one place.
 ///
-/// Pushed over the shell rather than given a tab: it is somewhere you go and
-/// come back from, not a place you work.
+/// ## A hub, not a pile
+///
+/// Seven sections, each a row that opens one screen. The alternative —
+/// every switch in the app on one scrolling page — is how a settings
+/// screen becomes the place nobody can find anything. It is also why the
+/// rows carry their current value: someone checking which currency they
+/// are on should not have to open a screen to find out.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final finance = context.finance;
-    final draft = ref.watch(onboardingControllerProvider).draft;
+    final profile = ref.watch(onboardingControllerProvider).draft;
     final themeMode = ref.watch(themeModeProvider);
+    final notifications = ref.watch(notificationPreferencesProvider);
+    final subscription = ref.watch(subscriptionProvider);
     final dataMode = ref.watch(mockDataModeProvider);
 
     return Scaffold(
       appBar: AppTopBar(
         title: 'Profile & settings',
         showBack: true,
-        onBack: () => context.pop(),
+        onBack: () => leaveSettings(context, fallback: Routes.home),
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.screenH),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenH,
+            AppSpacing.md,
+            AppSpacing.screenH,
+            AppSpacing.xxl,
+          ),
           children: [
-            if (draft != null)
+            if (profile != null)
               AppCard(
+                onTap: () => context.push(Routes.settingsProfile),
                 child: Row(
                   children: [
-                    AppAvatar(label: draft.name, size: AppIconSize.huge),
+                    AppAvatar(label: profile.name, size: AppIconSize.huge),
                     const SizedBox(width: AppSpacing.lg),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            draft.name,
+                            profile.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: AppTypography.titleCard.copyWith(
                               color: finance.textPrimary,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            draft.email,
+                            profile.email,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.bodySmall.copyWith(
                               color: finance.textSecondary,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            '${draft.country.name} · ${draft.currency.code} · '
-                            '${draft.language.label}',
-                            style: AppTypography.caption.copyWith(
-                              color: finance.textTertiary,
-                            ),
+                          Row(
+                            children: [
+                              AppBadge(
+                                label: subscription.plan.label,
+                                tone: subscription.isPremium
+                                    ? BadgeTone.income
+                                    : BadgeTone.neutral,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Flexible(
+                                child: Text(
+                                  '${profile.country.name} · '
+                                  '${profile.currency.code}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.caption.copyWith(
+                                    color: finance.textTertiary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                    ),
+                    Icon(
+                      AppIcons.chevronRight,
+                      size: AppIconSize.md,
+                      color: finance.textTertiary,
                     ),
                   ],
                 ),
               ),
             const SizedBox(height: AppSpacing.sectionGap),
 
-            SectionHeader(title: 'Appearance', padding: EdgeInsets.zero),
-            const SizedBox(height: AppSpacing.md),
-            AppCard(
-              child: AppDropdown<ThemeMode>(
-                label: 'Theme',
-                items: ThemeMode.values,
-                value: themeMode,
-                itemLabel: (mode) => switch (mode) {
-                  ThemeMode.system => 'Match system',
-                  ThemeMode.light => 'Light',
-                  ThemeMode.dark => 'Dark',
-                },
-                onChanged: (mode) {
-                  if (mode != null) {
-                    ref.read(themeModeProvider.notifier).set(mode);
-                  }
-                },
-              ),
+            SettingsSection(
+              title: 'Preferences',
+              rows: [
+                SettingsRow(
+                  title: 'Language, currency and region',
+                  icon: AppIcons.settings,
+                  value:
+                      '${profile?.language.label ?? 'English'} · '
+                      '${profile?.currency.code ?? 'TZS'}',
+                  onTap: () => context.push(Routes.settingsPreferences),
+                ),
+                SettingsRow(
+                  title: 'Appearance',
+                  icon: AppIcons.visible,
+                  value: switch (themeMode) {
+                    ThemeMode.system => 'Match system',
+                    ThemeMode.light => 'Light',
+                    ThemeMode.dark => 'Dark',
+                  },
+                  onTap: () => context.push(Routes.settingsPreferences),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sectionGap),
+
+            SettingsSection(
+              title: 'Notifications',
+              rows: [
+                SettingsRow(
+                  title: 'Alerts and reminders',
+                  icon: AppIcons.notifications,
+                  value: notifications.summary,
+                  onTap: () => context.push(Routes.settingsNotifications),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sectionGap),
+
+            SettingsSection(
+              title: 'Security & privacy',
+              rows: [
+                SettingsRow(
+                  title: 'Security',
+                  subtitle: 'How you sign in, and what protects this app.',
+                  icon: AppIcons.insurance,
+                  onTap: () => context.push(Routes.settingsPrivacy),
+                ),
+                SettingsRow(
+                  title: 'Your data',
+                  subtitle: 'What is kept, where it goes, and how to leave.',
+                  icon: AppIcons.download,
+                  onTap: () => context.push(Routes.settingsPrivacy),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sectionGap),
+
+            SettingsSection(
+              title: 'Subscription',
+              rows: [
+                SettingsRow(
+                  title: 'Your plan',
+                  subtitle: subscription.isPremium
+                      ? 'Premium, switched on for review'
+                      : 'Free — see what Premium adds',
+                  icon: AppIcons.success,
+                  value: subscription.plan.label,
+                  onTap: () => context.push(Routes.settingsSubscription),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sectionGap),
+
+            SettingsSection(
+              title: 'Help & support',
+              rows: [
+                SettingsRow(
+                  title: 'Help, contact and legal',
+                  icon: AppIcons.info,
+                  onTap: () => context.push(Routes.settingsHelp),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.sectionGap),
 
@@ -103,14 +205,14 @@ class SettingsScreen extends ConsumerWidget {
               padding: EdgeInsets.zero,
             ),
             const SizedBox(height: AppSpacing.md),
-            // Plain rows rather than ListTile: ListTile paints its
-            // background and ripple on the nearest Material ancestor, and
-            // AppCard's own decorated background sits in between — so the
-            // splash would be drawn underneath the card and never seen.
             AppCard(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.cardPadding,
+                vertical: AppSpacing.xs,
+              ),
               child: Column(
                 children: [
-                  _SettingRow(
+                  SettingsRow(
                     title: 'Show the empty dashboard',
                     subtitle: 'Reports an account with nothing recorded yet.',
                     trailing: Switch.adaptive(
@@ -125,7 +227,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   const AppDivider(),
-                  _SettingRow(
+                  SettingsRow(
                     title: 'Make the assistant fail',
                     subtitle:
                         'The next question comes back as an error, so the '
@@ -138,111 +240,50 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   const AppDivider(),
-                  _SettingRow(
+                  SettingsRow(
                     title: 'Design system showcase',
                     onTap: () => context.go(Routes.showcase),
-                    trailing: Icon(
-                      AppIcons.chevronRight,
-                      color: finance.textTertiary,
-                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.sectionGap),
 
-            AppButton.outlined(
-              label: 'Sign out',
-              icon: Icons.logout_rounded,
-              onPressed: () async {
-                final confirmed = await AppDialog.confirm(
-                  context,
-                  title: 'Sign out?',
-                  message:
-                      'Nothing is stored on this device yet, so you will '
-                      'start setup again next time.',
-                  confirmLabel: 'Sign out',
-                );
-                if (confirmed != true) return;
-
-                ref.read(onboardingControllerProvider.notifier).reset();
-                await ref.read(authControllerProvider.notifier).signOut();
-              },
+            SettingsSection(
+              title: 'Account',
+              rows: [
+                SettingsRow(
+                  title: 'Sign out',
+                  icon: Icons.logout_rounded,
+                  onTap: () => _signOut(context, ref),
+                ),
+                SettingsRow(
+                  title: 'Delete account',
+                  subtitle: 'Removes your account and everything in it.',
+                  icon: AppIcons.delete,
+                  isDestructive: true,
+                  onTap: () => context.push(Routes.settingsPrivacy),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-}
 
-/// One row inside a settings card.
-///
-/// Exists because [ListTile] cannot be used here: it paints its background
-/// and ink on the nearest [Material], which is behind [AppCard]'s own
-/// decorated surface, so the ripple would be invisible.
-class _SettingRow extends StatelessWidget {
-  const _SettingRow({
-    required this.title,
-    required this.trailing,
-    this.subtitle,
-    this.onTap,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget trailing;
-
-  /// Null for a row whose control is the trailing widget itself.
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final finance = context.finance;
-
-    final content = Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: AppTypography.bodyLarge.copyWith(
-                    color: finance.textPrimary,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    subtitle!,
-                    style: AppTypography.caption.copyWith(
-                      color: finance.textSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          trailing,
-        ],
-      ),
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final confirmed = await AppDialog.confirm(
+      context,
+      title: 'Sign out?',
+      message:
+          'Your transactions, budgets and goals stay on this device. You '
+          'will set up again the next time you sign in.',
+      confirmLabel: 'Sign out',
     );
+    if (confirmed != true) return;
 
-    if (onTap == null) return content;
-
-    return Semantics(
-      button: true,
-      label: title,
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.cardAll,
-        child: content,
-      ),
-    );
+    ref.read(onboardingControllerProvider.notifier).reset();
+    await ref.read(authControllerProvider.notifier).signOut();
   }
 }
